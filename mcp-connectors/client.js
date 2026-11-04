@@ -83,7 +83,6 @@ window.__ModuleLoader__.load({
       'action.save': '保存',
       'action.saving': '保存中…',
       'action.cancel': '取消',
-      'notice.saved': '已保存，连接器正在连接。',
       'error.name': '名称只能用字母、数字、_、-，最长 32 个字符。',
       'error.duplicate': '已经存在同名连接器。',
       'error.command': '请填写启动命令。',
@@ -152,7 +151,6 @@ window.__ModuleLoader__.load({
       'action.save': 'Save',
       'action.saving': 'Saving…',
       'action.cancel': 'Cancel',
-      'notice.saved': 'Saved — the connector is connecting.',
       'error.name': 'Names use letters, digits, _, or - — 32 characters max.',
       'error.duplicate': 'A connector with this name already exists.',
       'error.command': 'A command is required.',
@@ -740,7 +738,6 @@ window.__ModuleLoader__.load({
       const [servers, setServers] = useState([])
       const [view, setView] = useState({ ns: ENTRY_ID, revision: 0, writable: true })
       const [error, setError] = useState('')
-      const [notice, setNotice] = useState('')
       const [draft, setDraft] = useState(null)
       const [confirmIndex, setConfirmIndex] = useState(null)
       const [busy, setBusy] = useState(false)
@@ -860,7 +857,6 @@ window.__ModuleLoader__.load({
           return false
         }
         setBusy(true)
-        setNotice('')
         setError('')
         try {
           let result = await settings.update(view.ns, { servers: nextServers }, view.revision)
@@ -873,7 +869,6 @@ window.__ModuleLoader__.load({
             setError(t(failureKey(result.error) || 'error.save'))
             return false
           }
-          setNotice(t('notice.saved'))
           await load()
           return true
         } catch (caught) {
@@ -886,7 +881,6 @@ window.__ModuleLoader__.load({
       }
 
       const openEditor = (index) => {
-        setNotice('')
         setError('')
         setConfirmIndex(null)
         const form = index === null ? { ...EMPTY_FORM } : formFromServer(servers[index])
@@ -1181,7 +1175,6 @@ window.__ModuleLoader__.load({
                   type: 'button',
                   className: 'dsh-mcp-btn dsh-mcp-btn-ghost',
                   onClick: () => {
-                    setNotice('')
                     load()
                   },
                   disabled: busy,
@@ -1360,7 +1353,6 @@ window.__ModuleLoader__.load({
             ),
             headerActions.length > 0 ? h('div', { className: 'dsh-mcp-head-actions' }, headerActions) : null,
           ),
-          notice ? h('p', { className: 'dsh-mcp-notice', role: 'status' }, notice) : null,
           status === 'ready' && error ? h('p', { className: 'dsh-mcp-error', role: 'alert' }, error) : null,
           body,
         ),
@@ -1443,7 +1435,6 @@ window.__ModuleLoader__.load({
 .dsh-mcp-collapse-body{display:flex;flex-direction:column;gap:6px}
 .dsh-mcp-hint{margin:10px 0 0;color:var(--dsw-alias-label-secondary);font-size:12.5px;line-height:1.5}
 .dsh-mcp-error{margin:16px 0 0;color:var(--dsw-alias-state-error-primary);font-size:12.5px}
-.dsh-mcp-notice{margin:0 0 12px;color:var(--dsw-alias-state-success-primary);font-size:12.5px}
 .dsh-mcp-muted{color:var(--dsw-alias-label-secondary);font-size:13px}
 .dsh-mcp-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:44px 24px;text-align:center}
 .dsh-mcp-empty-title{margin:0;font-size:14px;font-weight:500}

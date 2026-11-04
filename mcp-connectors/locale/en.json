@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "MCP connectors",
+    "description": "Manage MCP server connections from a sidebar panel and expose their tools to the model."
+  }
+}

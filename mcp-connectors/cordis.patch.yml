@@ -1,0 +1,4 @@
+- insert:
+    - id: mcp-connectors
+      name: '@local/dsh-mcp-connectors'
+      config: {}

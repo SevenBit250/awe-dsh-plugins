@@ -1,0 +1,14 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+*.tsbuildinfo
+
+# logs and editor state
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

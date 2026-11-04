@@ -1,0 +1,38 @@
+{
+  "name": "@local/dsh-mcp-connectors",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP connectors: manage MCP server connections from a sidebar panel and expose their tools to the model.",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dependencies": {
+    "@deepseek-ai/dsh-mcp-client": "0.2.2-rc.1",
+    "@deepseek-ai/schemastery": "3.19.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  }
+}

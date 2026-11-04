@@ -557,7 +557,7 @@ window.__ModuleLoader__.load({
      */
     function Select({ value, options, label, onChange }) {
       const [open, setOpen] = useState(false)
-      const [active, setActive] = useState(0)
+      const [active, setActive] = useState(-1)
       const root = useRef(null)
       const current = options.find((option) => option.value === value) ?? options[0]
 
@@ -576,14 +576,16 @@ window.__ModuleLoader__.load({
           }
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
+            const selected = options.findIndex((option) => option.value === value)
             setActive((index) => {
+              if (index < 0) return selected < 0 ? 0 : selected
               const next = event.key === 'ArrowDown' ? index + 1 : index - 1
               return Math.max(0, Math.min(options.length - 1, next))
             })
             return
           }
           if (event.key === 'Enter' || event.key === ' ') {
-            const option = options[active]
+            const option = options[active] ?? options.find((entry) => entry.value === value)
             if (option === undefined) return
             event.preventDefault()
             onChange(option.value)
@@ -600,10 +602,9 @@ window.__ModuleLoader__.load({
 
       const toggle = () => {
         setOpen((wasOpen) => {
-          if (!wasOpen) {
-            const index = options.findIndex((option) => option.value === value)
-            setActive(index < 0 ? 0 : index)
-          }
+          // Opening starts with no keyboard cursor: the current value is shown
+          // by its check only, matching the host menus.
+          if (!wasOpen) setActive(-1)
           return !wasOpen
         })
       }
@@ -1363,7 +1364,6 @@ window.__ModuleLoader__.load({
 .dsh-mcp-menu-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsh-mcp-menu-item:hover,.dsh-mcp-menu-item.is-active{background:var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-2))}
 .dsh-mcp-menu-item:focus-visible{background:var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-2));outline:none}
-.dsh-mcp-menu-item.is-selected{background:var(--dsw-alias-interactive-bg-hover, var(--dsw-alias-bg-layer-2))}
 .dsh-mcp-json{resize:vertical;font-family:var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);font-size:12.5px;line-height:1.6;min-height:120px}
 .dsh-mcp-segment{display:inline-flex;gap:2px;padding:2px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
 .dsh-mcp-segment-item{height:28px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12.5px;cursor:pointer}

@@ -125,6 +125,27 @@ function connectionSignature(bridgeConfig) {
   return JSON.stringify(bridgeConfig)
 }
 
+/** Route the Client half polls for live connection state. */
+const STATUS_PATH = '/mcp-connectors/status'
+/** How long a mounted bridge may expose no tools before it reads as failed. */
+const CONNECT_GRACE_MS = 30_000
+
+/**
+ * Number of tools the bridge published for one server. A successful initial
+ * discovery registers `mcp__<serverName>__*`, so this is the positive proof of
+ * a live connection that the Host can observe from outside the bridge.
+ */
+function toolCountFor(tools, serverName) {
+  const prefix = `mcp__${serverName}__`
+  try {
+    return tools
+      .definitions()
+      .filter((definition) => typeof definition?.name === 'string' && definition.name.startsWith(prefix)).length
+  } catch {
+    return 0
+  }
+}
+
 /**
  * Mount one bridge instance per enabled connector and keep the set in sync with
  * the volatile config reference.
@@ -132,7 +153,7 @@ function connectionSignature(bridgeConfig) {
  * @param config - resolved config carrying the volatile connector list.
  */
 export function apply(ctx, config) {
-  /** serverName → { fiber, signature } for every live bridge instance. */
+  /** serverName → { fiber, signature, startedAt } for every live bridge instance. */
   const mounts = new Map()
 
   const warn = (message) => {
@@ -141,6 +162,48 @@ export function apply(ctx, config) {
     } catch {
       // A missing logger never fails the reconciliation.
     }
+  }
+
+  /**
+   * Live state of every configured connector, for the panel's status dots:
+   * `connected`, `connecting`, `error`, or `disabled`.
+   */
+  const statusList = () => {
+    const out = []
+    for (const server of readServers(config)) {
+      if (server === null || typeof server !== 'object') continue
+      const serverName = typeof server.name === 'string' ? server.name.trim() : ''
+      if (serverName === '') continue
+      if (server.enabled === false) {
+        out.push({ name: serverName, state: 'disabled' })
+        continue
+      }
+      const mount = mounts.get(serverName)
+      if (mount === undefined) {
+        // Enabled but never mounted: invalid config or a duplicate name.
+        out.push({ name: serverName, state: 'error' })
+        continue
+      }
+      let state
+      try {
+        const fiberState = mount.fiber.state
+        if (fiberState === 2) {
+          state = toolCountFor(ctx.tools, serverName) > 0
+            ? 'connected'
+            : Date.now() - mount.startedAt < CONNECT_GRACE_MS
+              ? 'connecting'
+              : 'error'
+        } else if (fiberState === 3) {
+          state = 'error'
+        } else {
+          state = 'connecting'
+        }
+      } catch {
+        state = 'error'
+      }
+      out.push({ name: serverName, state })
+    }
+    return out
   }
 
   const disposeMount = (serverName) => {
@@ -183,7 +246,7 @@ export function apply(ctx, config) {
       if (current !== undefined) disposeMount(serverName)
       try {
         const fiber = ctx.plugin(mcpClient, bridgeConfig)
-        mounts.set(serverName, { fiber, signature })
+        mounts.set(serverName, { fiber, signature, startedAt: Date.now() })
         // A failed connection or rejected config settles on the fiber; it must
         // not become an unhandled rejection of this plugin.
         Promise.resolve(fiber).catch((error) => {
@@ -198,6 +261,27 @@ export function apply(ctx, config) {
   // A volatile-only settings write keeps this fiber running: the Loader commits
   // the new reference and reports it here.
   ctx.on('loader/volatile-update', () => reconcile())
+
+  // The panel polls this route for its status dots. `webServer` is optional so
+  // the plugin still works in a composition without the browser carrier.
+  ctx.inject(['webServer'], (inner) => {
+    inner.effect(
+      () =>
+        inner.webServer.register({
+          kind: 'exact',
+          path: STATUS_PATH,
+          resource: async () =>
+            new Response(JSON.stringify({ servers: statusList() }), {
+              status: 200,
+              headers: {
+                'content-type': 'application/json; charset=utf-8',
+                'cache-control': 'no-store',
+              },
+            }),
+        }),
+      'mcp-connectors.status-route',
+    )
+  })
 
   ctx.effect(() => () => {
     for (const serverName of [...mounts.keys()]) disposeMount(serverName)

@@ -27,6 +27,10 @@ window.__ModuleLoader__.load({
     const ENTRY_ID = 'mcp-connectors'
     /** Position after the generated-tasks entry (order 10). */
     const PANEL_ORDER = 20
+    /** Host route publishing live connection state for the status dots. */
+    const STATUS_PATH = '/mcp-connectors/status'
+    /** Poll interval for that route while the panel is open. */
+    const STATUS_POLL_MS = 2000
     /** `dsh-mcp-client` namespace pattern. */
     const NAME_PATTERN = /^[A-Za-z0-9_-]{1,32}$/
     /** HTTP endpoint shape accepted by the bridge. */
@@ -49,6 +53,11 @@ window.__ModuleLoader__.load({
       'row.unnamed': '未命名',
       'row.noEndpoint': '尚未设置启动命令',
       'row.enabled': '启用',
+      'status.connected': '已连接',
+      'status.connecting': '连接中',
+      'status.error': '连接失败',
+      'status.disabled': '已停用',
+      'status.unknown': '状态未知',
       'editor.create.title': '新建 MCP 服务器',
       'editor.create.subtitle': '填写新的 MCP 配置，保存后返回列表。',
       'editor.edit.title': '编辑 MCP 服务器',
@@ -113,6 +122,11 @@ window.__ModuleLoader__.load({
       'row.unnamed': 'Unnamed',
       'row.noEndpoint': 'No command configured',
       'row.enabled': 'Enabled',
+      'status.connected': 'Connected',
+      'status.connecting': 'Connecting',
+      'status.error': 'Connection failed',
+      'status.disabled': 'Disabled',
+      'status.unknown': 'Status unknown',
       'editor.create.title': 'New MCP server',
       'editor.create.subtitle': 'Fill in the new MCP configuration; saving returns to the list.',
       'editor.edit.title': 'Edit MCP server',
@@ -730,6 +744,7 @@ window.__ModuleLoader__.load({
       const [draft, setDraft] = useState(null)
       const [confirmIndex, setConfirmIndex] = useState(null)
       const [busy, setBusy] = useState(false)
+      const [live, setLive] = useState({})
       const alive = useRef(true)
       const [, bumpLocale] = useState(0)
 
@@ -748,6 +763,39 @@ window.__ModuleLoader__.load({
           return undefined
         }
       }, [locale])
+
+      // Live connection state comes from the Host route; polling only while the
+      // panel is mounted keeps it cheap.
+      useEffect(() => {
+        let stopped = false
+        let timer
+        const poll = async () => {
+          try {
+            const response = await fetch(STATUS_PATH, {
+              headers: { accept: 'application/json' },
+              cache: 'no-store',
+            })
+            if (!response.ok) throw new Error(String(response.status))
+            const body = await response.json()
+            if (stopped) return
+            const next = {}
+            for (const entry of Array.isArray(body?.servers) ? body.servers : []) {
+              if (entry !== null && typeof entry?.name === 'string' && typeof entry?.state === 'string') {
+                next[entry.name] = entry.state
+              }
+            }
+            setLive(next)
+          } catch {
+            if (!stopped) setLive({})
+          }
+        }
+        poll()
+        timer = setInterval(poll, STATUS_POLL_MS)
+        return () => {
+          stopped = true
+          clearInterval(timer)
+        }
+      }, [])
 
       const load = async () => {
         if (settings === undefined) {
@@ -1199,10 +1247,18 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { className: 'dsh-mcp-card' },
-            servers.map((server, index) =>
-              h(
+            servers.map((server, index) => {
+              const state = server?.enabled === false ? 'disabled' : live[server?.name] ?? 'unknown'
+              const statusLabel = t(`status.${state}`)
+              return h(
                 'div',
                 { className: 'dsh-mcp-row', key: `${server?.name ?? 'connector'}-${index}` },
+                h(
+                  'div',
+                  { className: 'dsh-mcp-tile', title: statusLabel, role: 'img', 'aria-label': statusLabel },
+                  h(ConnectorsIcon, { size: 18 }),
+                  h('span', { className: `dsh-mcp-dot is-${state}`, 'aria-hidden': true }),
+                ),
                 h(
                   'div',
                   { className: 'dsh-mcp-row-main' },
@@ -1279,8 +1335,8 @@ window.__ModuleLoader__.load({
                         ),
                       ],
                 ),
-              ),
-            ),
+              )
+            }),
           ),
           h('p', { className: 'dsh-mcp-foot' }, t('footer.note')),
         )
@@ -1334,18 +1390,25 @@ window.__ModuleLoader__.load({
 .dsh-mcp-row{display:flex;align-items:center;gap:16px;padding:14px 16px;border-top:1px solid var(--dsw-alias-border-l1)}
 .dsh-mcp-row:first-child{border-top:0}
 .dsh-mcp-row-main{flex:1;min-width:0}
+.dsh-mcp-tile{position:relative;flex:none;width:38px;height:38px;border-radius:10px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);display:flex;align-items:center;justify-content:center}
+.dsh-mcp-dot{position:absolute;right:-2px;bottom:-2px;width:11px;height:11px;border-radius:50%;background:var(--dsw-alias-state-idle-primary);box-shadow:0 0 0 2px var(--dsw-alias-bg-layer-1)}
+.dsh-mcp-dot.is-connected{background:var(--dsw-alias-state-success-primary)}
+.dsh-mcp-dot.is-error{background:var(--dsw-alias-state-error-primary)}
+.dsh-mcp-dot.is-connecting{background:transparent;border:1.5px solid color-mix(in srgb,var(--dsw-alias-label-secondary) 30%,transparent);border-top-color:var(--dsw-alias-label-secondary);animation:dsh-mcp-spin .8s linear infinite}
+@keyframes dsh-mcp-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.dsh-mcp-dot.is-connecting{animation:none}}
 .dsh-mcp-row-title{display:flex;align-items:center;gap:8px;min-width:0}
 .dsh-mcp-name{font-family:var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsh-mcp-tag{flex:none;padding:1px 6px;border-radius:6px;border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);font-size:11px;letter-spacing:.02em}
 .dsh-mcp-row-sub{margin-top:4px;color:var(--dsw-alias-label-secondary);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsh-mcp-row-actions{display:flex;align-items:center;gap:4px;flex:none}
 .dsh-mcp-confirm{color:var(--dsw-alias-state-error-primary);font-size:12.5px;margin-right:4px}
-.dsh-mcp-switch{position:relative;flex:none;width:34px;height:20px;padding:0;border-radius:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);cursor:pointer;transition:background .12s ease,border-color .12s ease}
+.dsh-mcp-switch{position:relative;flex:none;width:36px;height:20px;padding:0;border-radius:999px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);cursor:pointer;transition:background .16s ease,border-color .16s ease}
 .dsh-mcp-switch:disabled{opacity:.5;cursor:default}
 .dsh-mcp-switch:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-.dsh-mcp-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .12s ease,background .12s ease}
-.dsh-mcp-switch.is-on{border-color:transparent;background:var(--dsw-alias-state-success-primary)}
-.dsh-mcp-switch.is-on .dsh-mcp-knob{transform:translateX(14px);background:var(--dsw-alias-bg-base)}
+.dsh-mcp-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-label-tertiary);transition:transform .16s ease,background .16s ease}
+.dsh-mcp-switch.is-on{border-color:transparent;background:var(--dsw-alias-brand-primary)}
+.dsh-mcp-switch.is-on .dsh-mcp-knob{transform:translateX(16px);background:var(--dsw-alias-bg-base)}
 .dsh-mcp-form{padding:22px 24px 20px;overflow:visible}
 .dsh-mcp-form-body{display:flex;flex-direction:column;gap:18px}
 .dsh-mcp-form-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:22px;padding-top:18px;border-top:1px solid var(--dsw-alias-border-l1)}

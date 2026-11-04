@@ -521,13 +521,136 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function Field({ label, hint, narrow, children }) {
+    function Field({ label, hint, narrow, plain, children }) {
       return h(
-        'label',
+        plain ? 'div' : 'label',
         { className: `dsh-mcp-field${narrow ? ' is-narrow' : ''}` },
         h('span', { className: 'dsh-mcp-field-label' }, label),
         children,
         hint ? h('span', { className: 'dsh-mcp-field-hint' }, hint) : null,
+      )
+    }
+
+    function CheckIcon() {
+      return h(
+        'svg',
+        {
+          viewBox: '0 0 16 16',
+          width: 14,
+          height: 14,
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 1.6,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          'aria-hidden': true,
+          style: { display: 'block', flex: 'none' },
+        },
+        h('path', { d: 'M3.6 8.4l2.9 2.9 5.9-6.4' }),
+      )
+    }
+
+    /**
+     * Host-style dropdown: a trigger that opens an anchored listbox with a check
+     * on the current value. Written here rather than imported, because a plugin
+     * does not load Harness Client packages; the look follows the primitives.
+     */
+    function Select({ value, options, label, onChange }) {
+      const [open, setOpen] = useState(false)
+      const [active, setActive] = useState(0)
+      const root = useRef(null)
+      const current = options.find((option) => option.value === value) ?? options[0]
+
+      useEffect(() => {
+        if (!open) return undefined
+        const closeOutside = (event) => {
+          if (root.current !== null && !root.current.contains(event.target)) setOpen(false)
+        }
+        const onKey = (event) => {
+          // Only keys aimed at this control; other fields keep their own Enter/Space.
+          if (root.current === null || !root.current.contains(event.target)) return
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            setOpen(false)
+            return
+          }
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault()
+            setActive((index) => {
+              const next = event.key === 'ArrowDown' ? index + 1 : index - 1
+              return Math.max(0, Math.min(options.length - 1, next))
+            })
+            return
+          }
+          if (event.key === 'Enter' || event.key === ' ') {
+            const option = options[active]
+            if (option === undefined) return
+            event.preventDefault()
+            onChange(option.value)
+            setOpen(false)
+          }
+        }
+        document.addEventListener('pointerdown', closeOutside, true)
+        document.addEventListener('keydown', onKey, true)
+        return () => {
+          document.removeEventListener('pointerdown', closeOutside, true)
+          document.removeEventListener('keydown', onKey, true)
+        }
+      }, [open, active, options, onChange])
+
+      const toggle = () => {
+        setOpen((wasOpen) => {
+          if (!wasOpen) {
+            const index = options.findIndex((option) => option.value === value)
+            setActive(index < 0 ? 0 : index)
+          }
+          return !wasOpen
+        })
+      }
+
+      return h(
+        'div',
+        { className: 'dsh-mcp-select', ref: root },
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'dsh-mcp-select-trigger',
+            'aria-haspopup': 'listbox',
+            'aria-expanded': open ? 'true' : 'false',
+            'aria-label': label,
+            onClick: toggle,
+          },
+          h('span', { className: 'dsh-mcp-select-value' }, current?.label ?? ''),
+          h(Chevron, { open }),
+        ),
+        open
+          ? h(
+              'div',
+              { className: 'dsh-mcp-menu', role: 'listbox', 'aria-label': label },
+              options.map((option, index) =>
+                h(
+                  'button',
+                  {
+                    key: option.value,
+                    type: 'button',
+                    role: 'option',
+                    'aria-selected': option.value === value ? 'true' : 'false',
+                    className: `dsh-mcp-menu-item${option.value === value ? ' is-selected' : ''}${
+                      index === active ? ' is-active' : ''
+                    }`,
+                    onMouseEnter: () => setActive(index),
+                    onClick: () => {
+                      onChange(option.value)
+                      setOpen(false)
+                    },
+                  },
+                  h('span', null, option.label),
+                  option.value === value ? h(CheckIcon) : null,
+                ),
+              ),
+            )
+          : null,
       )
     }
 
@@ -853,21 +976,16 @@ window.__ModuleLoader__.load({
           ),
           h(
             Field,
-            { label: t('field.type'), narrow: true },
-            h(
-              'div',
-              { className: 'dsh-mcp-select' },
-              h(
-                'select',
-                {
-                  className: 'dsh-mcp-input dsh-mcp-select-input',
-                  value: form.transport,
-                  onChange: (event) => setForm({ transport: event.target.value }),
-                },
-                h('option', { value: 'stdio' }, t('type.stdio')),
-                h('option', { value: 'streamable-http' }, t('type.http')),
-              ),
-            ),
+            { label: t('field.type'), narrow: true, plain: true },
+            h(Select, {
+              value: form.transport,
+              label: t('field.type'),
+              options: [
+                { value: 'stdio', label: t('type.stdio') },
+                { value: 'streamable-http', label: t('type.http') },
+              ],
+              onChange: (value) => setForm({ transport: value }),
+            }),
           ),
           h(
             Field,
@@ -1226,7 +1344,7 @@ window.__ModuleLoader__.load({
 .dsh-mcp-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .12s ease,background .12s ease}
 .dsh-mcp-switch.is-on{border-color:transparent;background:var(--dsw-alias-state-success-primary)}
 .dsh-mcp-switch.is-on .dsh-mcp-knob{transform:translateX(14px);background:var(--dsw-alias-bg-base)}
-.dsh-mcp-form{padding:22px 24px 20px}
+.dsh-mcp-form{padding:22px 24px 20px;overflow:visible}
 .dsh-mcp-form-body{display:flex;flex-direction:column;gap:18px}
 .dsh-mcp-form-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:22px;padding-top:18px;border-top:1px solid var(--dsw-alias-border-l1)}
 .dsh-mcp-field{display:flex;flex-direction:column;gap:6px;min-width:0}
@@ -1236,8 +1354,14 @@ window.__ModuleLoader__.load({
 .dsh-mcp-input{width:100%;min-height:34px;padding:7px 10px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;outline:none}
 .dsh-mcp-input:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 22%,transparent)}
 .dsh-mcp-select{position:relative}
-.dsh-mcp-select-input{appearance:none;-webkit-appearance:none;padding-right:30px;cursor:pointer}
-.dsh-mcp-select::after{content:"";position:absolute;right:12px;top:calc(50% - 7px);width:5px;height:5px;border-right:1.4px solid var(--dsw-alias-label-secondary);border-bottom:1.4px solid var(--dsw-alias-label-secondary);transform:rotate(45deg);pointer-events:none}
+.dsh-mcp-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:34px;padding:0 10px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.dsh-mcp-select-trigger:hover{background:var(--dsw-alias-bg-layer-1)}
+.dsh-mcp-select-trigger:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
+.dsh-mcp-select-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsh-mcp-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:30;min-width:100%;padding:4px;display:flex;flex-direction:column;gap:2px;border-radius:var(--dsw-radius-lg, 10px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-overlay);box-shadow:0 10px 28px rgb(0 0 0 / 26%)}
+.dsh-mcp-menu-item{display:flex;align-items:center;justify-content:space-between;gap:12px;height:34px;padding:0 10px;border:0;border-radius:var(--dsw-radius-md, 8px);background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;text-align:left;cursor:pointer;white-space:nowrap}
+.dsh-mcp-menu-item:hover,.dsh-mcp-menu-item.is-active{background:var(--dsw-alias-bg-layer-2)}
+.dsh-mcp-menu-item.is-selected{font-weight:500}
 .dsh-mcp-json{resize:vertical;font-family:var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);font-size:12.5px;line-height:1.6;min-height:120px}
 .dsh-mcp-segment{display:inline-flex;gap:2px;padding:2px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
 .dsh-mcp-segment-item{height:28px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12.5px;cursor:pointer}

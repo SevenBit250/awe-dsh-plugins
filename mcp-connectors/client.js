@@ -56,7 +56,6 @@ window.__ModuleLoader__.load({
       'mode.form': '表单',
       'mode.json': 'JSON',
       'field.name': '名称',
-      'field.name.hint': '工具前缀，只能包含字母、数字、下划线或连字符，最长 32 个字符。',
       'field.type': '类型',
       'type.stdio': 'stdio（本地命令）',
       'type.http': 'HTTP（远程服务）',
@@ -76,7 +75,7 @@ window.__ModuleLoader__.load({
       'action.saving': '保存中…',
       'action.cancel': '取消',
       'notice.saved': '已保存，连接器正在连接。',
-      'error.name': '名称只能包含字母、数字、下划线或连字符，长度为 1–32 个字符。',
+      'error.name': '名称只能用字母、数字、_、-，最长 32 个字符。',
       'error.duplicate': '已经存在同名连接器。',
       'error.command': '请填写启动命令。',
       'error.url': '请填写以 http:// 或 https:// 开头的服务地址。',
@@ -121,7 +120,6 @@ window.__ModuleLoader__.load({
       'mode.form': 'Form',
       'mode.json': 'JSON',
       'field.name': 'Name',
-      'field.name.hint': 'Tool prefix: letters, digits, underscore, or hyphen, at most 32 characters.',
       'field.type': 'Type',
       'type.stdio': 'stdio (local command)',
       'type.http': 'HTTP (remote server)',
@@ -141,7 +139,7 @@ window.__ModuleLoader__.load({
       'action.saving': 'Saving…',
       'action.cancel': 'Cancel',
       'notice.saved': 'Saved — the connector is connecting.',
-      'error.name': 'Names use letters, digits, underscore, or hyphen, 1–32 characters.',
+      'error.name': 'Names use letters, digits, _, or - — 32 characters max.',
       'error.duplicate': 'A connector with this name already exists.',
       'error.command': 'A command is required.',
       'error.url': 'A server URL starting with http:// or https:// is required.',
@@ -924,6 +922,7 @@ window.__ModuleLoader__.load({
       if (draft !== null) {
         const form = draft.form
         const setForm = (patch) => patchDraft({ form: { ...form, ...patch } })
+        const nameInvalid = form.name.trim() !== '' && !NAME_PATTERN.test(form.name.trim())
         const modeSegment = h(Segment, {
           value: draft.mode,
           large: true,
@@ -965,15 +964,17 @@ window.__ModuleLoader__.load({
           { className: 'dsh-mcp-form-body' },
           h(
             Field,
-            { label: t('field.name'), hint: t('field.name.hint'), narrow: true },
+            { label: t('field.name'), narrow: true },
             h('input', {
               className: 'dsh-mcp-input',
               value: form.name,
               spellCheck: false,
               autoComplete: 'off',
               placeholder: 'my-mcp-server',
+              'aria-invalid': nameInvalid ? 'true' : 'false',
               onChange: (event) => setForm({ name: event.target.value }),
             }),
+            nameInvalid ? h('span', { className: 'dsh-mcp-field-error', role: 'alert' }, t('error.name')) : null,
           ),
           h(
             Field,
@@ -1352,6 +1353,7 @@ window.__ModuleLoader__.load({
 .dsh-mcp-field.is-narrow{max-width:340px}
 .dsh-mcp-field-label{font-size:13px;font-weight:500;color:var(--dsw-alias-label-primary)}
 .dsh-mcp-field-hint{font-size:11.5px;line-height:1.45;color:var(--dsw-alias-label-secondary)}
+.dsh-mcp-field-error{font-size:11.5px;line-height:1.45;color:var(--dsw-alias-state-error-primary)}
 .dsh-mcp-input{width:100%;min-height:34px;padding:7px 10px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;outline:none}
 .dsh-mcp-input:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 22%,transparent)}
 .dsh-mcp-select{position:relative}

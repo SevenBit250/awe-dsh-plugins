@@ -53,9 +53,6 @@ window.__ModuleLoader__.load({
       'editor.create.subtitle': '填写新的 MCP 配置，保存后返回列表。',
       'editor.edit.title': '编辑 MCP 服务器',
       'editor.edit.subtitle': '修改后保存，返回列表。',
-      'editor.scope': '作用域',
-      'editor.scopeValue': '本机 · 用户',
-      'editor.scopeHint': 'MCP 配置保存在当前 DSH profile 中，对本机所有会话生效。',
       'mode.form': '表单',
       'mode.json': 'JSON',
       'field.name': '名称',
@@ -123,9 +120,6 @@ window.__ModuleLoader__.load({
       'editor.create.subtitle': 'Fill in the new MCP configuration; saving returns to the list.',
       'editor.edit.title': 'Edit MCP server',
       'editor.edit.subtitle': 'Save your changes to return to the list.',
-      'editor.scope': 'Scope',
-      'editor.scopeValue': 'Local · User',
-      'editor.scopeHint': 'The configuration lives in the current DSH profile and applies to every session on this machine.',
       'mode.form': 'Form',
       'mode.json': 'JSON',
       'field.name': 'Name',
@@ -563,27 +557,6 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function MonitorIcon() {
-      return h(
-        'svg',
-        {
-          viewBox: '0 0 16 16',
-          width: 14,
-          height: 14,
-          fill: 'none',
-          stroke: 'currentColor',
-          strokeWidth: 1.2,
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round',
-          'aria-hidden': true,
-          style: { display: 'block' },
-        },
-        h('rect', { x: 2, y: 3, width: 12, height: 8, rx: 1.5 }),
-        h('path', { d: 'M8 11v2.1' }),
-        h('path', { d: 'M5.6 13.1h4.8' }),
-      )
-    }
-
     function Chevron({ open }) {
       return h(
         'svg',
@@ -893,34 +866,16 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'dsh-mcp-form-body' },
           h(
-            'div',
-            { className: 'dsh-mcp-name-row' },
-            h(
-              'div',
-              { className: 'dsh-mcp-name-field' },
-              h('span', { className: 'dsh-mcp-field-label' }, t('field.name')),
-              h('input', {
-                className: 'dsh-mcp-input',
-                value: form.name,
-                spellCheck: false,
-                autoComplete: 'off',
-                placeholder: 'my-mcp-server',
-                'aria-label': t('field.name'),
-                onChange: (event) => setForm({ name: event.target.value }),
-              }),
-              h('span', { className: 'dsh-mcp-field-hint' }, t('field.name.hint')),
-            ),
-            h(
-              'div',
-              { className: 'dsh-mcp-scope', title: t('editor.scopeHint') },
-              h('span', { className: 'dsh-mcp-scope-label' }, t('editor.scope')),
-              h(
-                'span',
-                { className: 'dsh-mcp-scope-chip' },
-                h(MonitorIcon),
-                h('span', {}, t('editor.scopeValue')),
-              ),
-            ),
+            Field,
+            { label: t('field.name'), hint: t('field.name.hint'), narrow: true },
+            h('input', {
+              className: 'dsh-mcp-input',
+              value: form.name,
+              spellCheck: false,
+              autoComplete: 'off',
+              placeholder: 'my-mcp-server',
+              onChange: (event) => setForm({ name: event.target.value }),
+            }),
           ),
           h(
             Field,
@@ -1301,11 +1256,6 @@ window.__ModuleLoader__.load({
 .dsh-mcp-form{padding:22px 24px 20px}
 .dsh-mcp-form-body{display:flex;flex-direction:column;gap:18px}
 .dsh-mcp-form-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:22px;padding-top:18px;border-top:1px solid var(--dsw-alias-border-l1)}
-.dsh-mcp-name-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
-.dsh-mcp-name-field{display:flex;flex-direction:column;gap:6px;max-width:340px;flex:1;min-width:0}
-.dsh-mcp-scope{display:flex;align-items:center;gap:8px;flex:none}
-.dsh-mcp-scope-label{color:var(--dsw-alias-label-secondary);font-size:13px}
-.dsh-mcp-scope-chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary);font-size:13px;background:transparent}
 .dsh-mcp-field{display:flex;flex-direction:column;gap:6px;min-width:0}
 .dsh-mcp-field.is-narrow{max-width:340px}
 .dsh-mcp-field-label{font-size:13px;font-weight:500;color:var(--dsw-alias-label-primary)}
@@ -1332,7 +1282,7 @@ window.__ModuleLoader__.load({
 .dsh-mcp-empty-title{margin:0;font-size:14px;font-weight:500}
 .dsh-mcp-empty-body{margin:0;max-width:420px;color:var(--dsw-alias-label-secondary);font-size:13px}
 .dsh-mcp-foot{margin:14px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px}
-@media (max-width:560px){.dsh-mcp-page{padding:20px 16px 56px}.dsh-mcp-row{flex-direction:column;align-items:stretch;gap:10px}.dsh-mcp-row-actions{justify-content:flex-end}.dsh-mcp-name-row{flex-direction:column;align-items:stretch}.dsh-mcp-scope{justify-content:flex-start}}
+@media (max-width:560px){.dsh-mcp-page{padding:20px 16px 56px}.dsh-mcp-row{flex-direction:column;align-items:stretch;gap:10px}.dsh-mcp-row-actions{justify-content:flex-end}}
 `
 
     function StyleSheet() {

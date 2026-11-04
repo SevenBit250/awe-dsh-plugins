@@ -427,7 +427,7 @@ window.__ModuleLoader__.load({
           ? parseArgsText(config.args)
           : []
       const timeout = Number(config.timeout ?? config.toolCallTimeoutMs ?? 0)
-      const server = {
+      return {
         name: String(config.name ?? name).trim(),
         label: typeof config.label === 'string' ? config.label : previous?.label ?? '',
         transport,
@@ -440,9 +440,16 @@ window.__ModuleLoader__.load({
         timeoutMs: Number.isFinite(timeout) && timeout > 0 ? Math.round(timeout) : 0,
         enabled: config.enabled === undefined ? previous?.enabled !== false : config.enabled !== false,
       }
+    }
+
+    /**
+     * What a connector needs before it can be saved. Conversion between the form
+     * and JSON tabs never validates, so switching modes works on a blank draft.
+     */
+    function validateServer(server) {
       if (!NAME_PATTERN.test(server.name)) throw new Error('error.name')
-      if (transport === 'stdio' && server.command === '') throw new Error('error.command')
-      if (transport === 'streamable-http' && !URL_PATTERN.test(server.url)) throw new Error('error.url')
+      if (server.transport === 'stdio' && server.command.trim() === '') throw new Error('error.command')
+      if (server.transport === 'streamable-http' && !URL_PATTERN.test(server.url)) throw new Error('error.url')
       return server
     }
 
@@ -461,11 +468,7 @@ window.__ModuleLoader__.load({
       const entries = Object.entries(map)
       if (entries.length === 0) throw new Error('error.jsonEmpty')
       const servers = []
-      for (const [name, config] of entries) {
-        const server = serverFromJson(name, config, undefined)
-        if (!NAME_PATTERN.test(server.name)) throw new Error('error.name')
-        servers.push(server)
-      }
+      for (const [name, config] of entries) servers.push(serverFromJson(name, config, undefined))
       return servers
     }
 
@@ -777,8 +780,8 @@ window.__ModuleLoader__.load({
         if (draft === null) return
         let incoming
         try {
-          if (draft.mode === 'json') incoming = parseServerMap(draft.jsonText)
-          else incoming = [serverFromForm(draft.form)]
+          if (draft.mode === 'json') incoming = parseServerMap(draft.jsonText).map(validateServer)
+          else incoming = [validateServer(serverFromForm(draft.form))]
         } catch (caught) {
           patchDraft({ error: t(caught.message) })
           return

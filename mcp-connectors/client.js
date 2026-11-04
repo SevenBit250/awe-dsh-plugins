@@ -521,9 +521,9 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function Field({ label, hint, narrow, plain, children }) {
+    function Field({ label, hint, narrow, children }) {
       return h(
-        plain ? 'div' : 'label',
+        'label',
         { className: `dsh-mcp-field${narrow ? ' is-narrow' : ''}` },
         h('span', { className: 'dsh-mcp-field-label' }, label),
         children,
@@ -853,15 +853,21 @@ window.__ModuleLoader__.load({
           ),
           h(
             Field,
-            { label: t('field.type'), plain: true },
-            h(Segment, {
-              value: form.transport,
-              options: [
-                { value: 'stdio', label: t('type.stdio') },
-                { value: 'streamable-http', label: t('type.http') },
-              ],
-              onChange: (value) => setForm({ transport: value }),
-            }),
+            { label: t('field.type'), narrow: true },
+            h(
+              'div',
+              { className: 'dsh-mcp-select' },
+              h(
+                'select',
+                {
+                  className: 'dsh-mcp-input dsh-mcp-select-input',
+                  value: form.transport,
+                  onChange: (event) => setForm({ transport: event.target.value }),
+                },
+                h('option', { value: 'stdio' }, t('type.stdio')),
+                h('option', { value: 'streamable-http' }, t('type.http')),
+              ),
+            ),
           ),
           h(
             Field,
@@ -1229,6 +1235,9 @@ window.__ModuleLoader__.load({
 .dsh-mcp-field-hint{font-size:11.5px;line-height:1.45;color:var(--dsw-alias-label-secondary)}
 .dsh-mcp-input{width:100%;min-height:34px;padding:7px 10px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;outline:none}
 .dsh-mcp-input:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 22%,transparent)}
+.dsh-mcp-select{position:relative}
+.dsh-mcp-select-input{appearance:none;-webkit-appearance:none;padding-right:30px;cursor:pointer}
+.dsh-mcp-select::after{content:"";position:absolute;right:12px;top:calc(50% - 7px);width:5px;height:5px;border-right:1.4px solid var(--dsw-alias-label-secondary);border-bottom:1.4px solid var(--dsw-alias-label-secondary);transform:rotate(45deg);pointer-events:none}
 .dsh-mcp-json{resize:vertical;font-family:var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);font-size:12.5px;line-height:1.6;min-height:120px}
 .dsh-mcp-segment{display:inline-flex;gap:2px;padding:2px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
 .dsh-mcp-segment-item{height:28px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12.5px;cursor:pointer}

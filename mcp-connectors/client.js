@@ -57,8 +57,6 @@ window.__ModuleLoader__.load({
       'mode.json': 'JSON',
       'field.name': '名称',
       'field.name.hint': '工具前缀，只能包含字母、数字、下划线或连字符，最长 32 个字符。',
-      'field.label': '显示名（可选）',
-      'field.label.hint': '只用于这个面板。',
       'field.type': '类型',
       'type.stdio': 'stdio（本地命令）',
       'type.http': 'HTTP（远程服务）',
@@ -124,8 +122,6 @@ window.__ModuleLoader__.load({
       'mode.json': 'JSON',
       'field.name': 'Name',
       'field.name.hint': 'Tool prefix: letters, digits, underscore, or hyphen, at most 32 characters.',
-      'field.label': 'Display name (optional)',
-      'field.label.hint': 'Shown only in this panel.',
       'field.type': 'Type',
       'type.stdio': 'stdio (local command)',
       'type.http': 'HTTP (remote server)',
@@ -321,7 +317,6 @@ window.__ModuleLoader__.load({
 
     const EMPTY_FORM = {
       name: '',
-      label: '',
       transport: 'stdio',
       command: '',
       argsText: '',
@@ -337,7 +332,6 @@ window.__ModuleLoader__.load({
     function formFromServer(server) {
       return {
         name: typeof server?.name === 'string' ? server.name : '',
-        label: typeof server?.label === 'string' ? server.label : '',
         transport: server?.transport === 'streamable-http' ? 'streamable-http' : 'stdio',
         command: typeof server?.command === 'string' ? server.command : '',
         argsText: formatArgsText(server?.args),
@@ -365,7 +359,6 @@ window.__ModuleLoader__.load({
         if (!URL_PATTERN.test(url)) throw new Error('error.url')
         return {
           name,
-          label: form.label.trim(),
           transport: 'streamable-http',
           command: '',
           args: [],
@@ -381,7 +374,6 @@ window.__ModuleLoader__.load({
       if (command === '') throw new Error('error.command')
       return {
         name,
-        label: form.label.trim(),
         transport: 'stdio',
         command,
         args: parseArgsText(form.argsText),
@@ -394,26 +386,7 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** Full-config JSON for one connector, the shape the JSON tab edits. */
-    function serializeServer(name, server) {
-      const body = {}
-      if (server.transport === 'streamable-http') {
-        body.type = 'http'
-        body.url = server.url
-        body.headers = server.headers ?? {}
-      } else {
-        body.type = 'stdio'
-        body.command = server.command
-        body.args = server.args ?? []
-        body.env = server.env ?? {}
-      }
-      if (server.label) body.label = server.label
-      if (Number(server.timeoutMs) > 0) body.timeout = Number(server.timeoutMs)
-      if (server.enabled === false) body.enabled = false
-      return body
-    }
-
-    /** Connector out of one JSON entry; keeps prior display fields when absent. */
+    /** Connector out of one JSON entry; keeps prior fields when absent. */
     function serverFromJson(name, config, previous) {
       if (config === null || typeof config !== 'object' || Array.isArray(config)) throw new Error('error.jsonValue')
       const rawType = String(config.type ?? config.transport ?? (config.url !== undefined ? 'http' : 'stdio')).toLowerCase()
@@ -429,7 +402,6 @@ window.__ModuleLoader__.load({
       const timeout = Number(config.timeout ?? config.toolCallTimeoutMs ?? 0)
       return {
         name: String(config.name ?? name).trim(),
-        label: typeof config.label === 'string' ? config.label : previous?.label ?? '',
         transport,
         command: transport === 'stdio' ? String(config.command ?? '').trim() : '',
         args: transport === 'stdio' ? args : [],
@@ -493,7 +465,6 @@ window.__ModuleLoader__.load({
           env: safeObjectText(form.envText),
         }
       }
-      if (form.label.trim() !== '') body.label = form.label.trim()
       const timeoutText = String(form.timeoutText ?? '').trim()
       if (timeoutText !== '') body.timeout = Number(timeoutText) > 0 ? Number(timeoutText) : timeoutText
       if (form.enabled === false) body.enabled = false
@@ -882,11 +853,6 @@ window.__ModuleLoader__.load({
           ),
           h(
             Field,
-            { label: t('field.label'), hint: t('field.label.hint'), narrow: true },
-            text('label'),
-          ),
-          h(
-            Field,
             { label: t('field.type'), plain: true },
             h(Segment, {
               value: form.transport,
@@ -1118,7 +1084,6 @@ window.__ModuleLoader__.load({
                     'div',
                     { className: 'dsh-mcp-row-title' },
                     h('span', { className: 'dsh-mcp-name' }, server?.name || t('row.unnamed')),
-                    server?.label ? h('span', { className: 'dsh-mcp-label' }, server.label) : null,
                     h(
                       'span',
                       { className: 'dsh-mcp-tag' },
@@ -1245,7 +1210,6 @@ window.__ModuleLoader__.load({
 .dsh-mcp-row-main{flex:1;min-width:0}
 .dsh-mcp-row-title{display:flex;align-items:center;gap:8px;min-width:0}
 .dsh-mcp-name{font-family:var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.dsh-mcp-label{color:var(--dsw-alias-label-secondary);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsh-mcp-tag{flex:none;padding:1px 6px;border-radius:6px;border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);font-size:11px;letter-spacing:.02em}
 .dsh-mcp-row-sub{margin-top:4px;color:var(--dsw-alias-label-secondary);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dsh-mcp-row-actions{display:flex;align-items:center;gap:4px;flex:none}

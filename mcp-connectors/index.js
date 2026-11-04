@@ -37,6 +37,8 @@ const ServerSchema = z.object({
   cwd: z.string().default(''),
   url: z.string().default(''),
   headers: z.dict(String).default({}),
+  /** Per-call timeout for `tools/call`; 0 keeps the bridge default (60 s). */
+  timeoutMs: z.number().default(0),
   enabled: z.boolean().default(true),
 })
 
@@ -83,6 +85,8 @@ function readServers(config) {
 function toBridgeConfig(server) {
   const serverName = typeof server?.name === 'string' ? server.name.trim() : ''
   if (!SERVER_NAME_PATTERN.test(serverName)) return { reason: `invalid connector name "${serverName}"` }
+  const timeoutMs = Number(server.timeoutMs)
+  const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? { toolCallTimeoutMs: timeoutMs } : {}
   if (server.transport === 'streamable-http') {
     const url = typeof server.url === 'string' ? server.url.trim() : ''
     if (url === '') return { reason: `connector "${serverName}" has no URL` }
@@ -93,6 +97,7 @@ function toBridgeConfig(server) {
         url,
         headers: stringDict(server.headers),
         failOnStartupError: false,
+        ...timeout,
       },
     }
   }
@@ -105,6 +110,7 @@ function toBridgeConfig(server) {
     args: stringList(server.args),
     env: stringDict(server.env),
     failOnStartupError: false,
+    ...timeout,
   }
   const cwd = typeof server.cwd === 'string' ? server.cwd.trim() : ''
   if (cwd !== '') config.cwd = cwd

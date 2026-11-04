@@ -2,9 +2,13 @@
  * MCP connectors — Web half.
  *
  * Registers the "Connectors" entry in the sidebar panel list (below the
- * generated-tasks entry) and the management page it selects. The page reads and
- * writes this plugin's own volatile connector list through the generated
- * `ctx.remote.settings` namespace, so no Host RPC of our own is required.
+ * generated-tasks entry) and the management pages it selects: the connector
+ * list, and a create/edit page modelled on the familiar MCP "add server" form
+ * (form / JSON modes, stdio or HTTP, timeout, environment or headers).
+ *
+ * The page reads and writes this plugin's own volatile connector list through
+ * the generated `ctx.remote.settings` namespace, so no Host RPC of our own is
+ * required.
  *
  * @module @local/dsh-mcp-connectors/client
  */
@@ -31,7 +35,7 @@ window.__ModuleLoader__.load({
     const ZH = {
       'panel.label': '连接器',
       'page.title': '连接器',
-      'page.subtitle': '连接 MCP 服务器，把它们提供的工具直接交给模型使用。保存后立即生效。',
+      'page.subtitle': '连接 MCP 服务器，把它们提供的工具直接交给模型使用。',
       'page.add': '添加连接器',
       'page.refresh': '刷新',
       'page.loading': '正在读取连接器配置…',
@@ -45,33 +49,50 @@ window.__ModuleLoader__.load({
       'row.unnamed': '未命名',
       'row.noEndpoint': '尚未设置启动命令',
       'row.enabled': '启用',
-      'editor.create': '添加连接器',
-      'editor.edit': '编辑连接器',
+      'editor.create.title': '新建 MCP 服务器',
+      'editor.create.subtitle': '填写新的 MCP 配置，保存后返回列表。',
+      'editor.edit.title': '编辑 MCP 服务器',
+      'editor.edit.subtitle': '修改后保存，返回列表。',
+      'editor.scope': '作用域',
+      'editor.scopeValue': '本机 · 用户',
+      'editor.scopeHint': 'MCP 配置保存在当前 DSH profile 中，对本机所有会话生效。',
+      'mode.form': '表单',
+      'mode.json': 'JSON',
       'field.name': '名称',
       'field.name.hint': '工具前缀，只能包含字母、数字、下划线或连字符，最长 32 个字符。',
-      'field.label': '显示名',
-      'field.label.hint': '可选，只用于这个面板。',
-      'field.transport': '传输方式',
+      'field.label': '显示名（可选）',
+      'field.label.hint': '只用于这个面板。',
+      'field.type': '类型',
+      'type.stdio': 'stdio（本地命令）',
+      'type.http': 'HTTP（远程服务）',
+      'field.timeout': '超时时间 MS',
+      'field.timeout.hint': '留空使用默认值 60000。',
       'field.command': '命令',
-      'field.command.hint': '例如 npx。',
-      'field.args': '参数',
-      'field.args.hint': '每行一个参数。',
-      'field.env': '环境变量',
-      'field.env.hint': '每行一个 KEY=VALUE；父进程的敏感变量不会自动透传。',
-      'field.cwd': '工作目录',
-      'field.cwd.hint': '可选。',
+      'field.args': '参数（空格分隔）',
+      'field.args.hint': '含空格的参数用引号包裹。',
+      'field.env': '环境变量（可选）',
+      'field.env.hint': 'JSON 对象，可以留空。',
       'field.url': '服务地址',
-      'field.headers': '请求头',
-      'field.headers.hint': '每行一个 KEY=VALUE。',
-      'field.enabled': '启用',
+      'field.headers': '请求头（可选）',
+      'field.headers.hint': 'JSON 对象，可以留空。',
+      'field.json': '完整配置',
+      'json.hint': '支持直接粘贴 {"server-name": {…}} 或 {"mcpServers": {"server-name": {…}}}。',
       'action.save': '保存',
       'action.saving': '保存中…',
+      'action.cancel': '取消',
       'notice.saved': '已保存，连接器正在连接。',
       'error.name': '名称只能包含字母、数字、下划线或连字符，长度为 1–32 个字符。',
       'error.duplicate': '已经存在同名连接器。',
       'error.command': '请填写启动命令。',
       'error.url': '请填写以 http:// 或 https:// 开头的服务地址。',
-      'error.pairs': '每一行都必须是 KEY=VALUE。',
+      'error.timeout': '超时时间必须是正整数。',
+      'error.type': '类型只支持 stdio 或 http。',
+      'error.json': 'JSON 格式有误。',
+      'error.jsonObject': '需要一个 JSON 对象。',
+      'error.jsonValue': '字段值必须是字符串或对象。',
+      'error.jsonEmpty': '至少需要一个服务器配置。',
+      'error.jsonSingle': '切回表单前只能保留一个服务器配置。',
+      'error.quote': '引号没有闭合。',
       'error.load': '读取连接器配置失败。',
       'error.save': '保存失败。',
       'error.noEntry': '找不到连接器配置：本插件可能还没有加载完成。',
@@ -84,7 +105,7 @@ window.__ModuleLoader__.load({
     const EN = {
       'panel.label': 'Connectors',
       'page.title': 'Connectors',
-      'page.subtitle': 'Connect MCP servers and hand their tools to the model. Changes apply immediately.',
+      'page.subtitle': 'Connect MCP servers and hand their tools to the model.',
       'page.add': 'Add connector',
       'page.refresh': 'Refresh',
       'page.loading': 'Reading connector configuration…',
@@ -98,33 +119,50 @@ window.__ModuleLoader__.load({
       'row.unnamed': 'Unnamed',
       'row.noEndpoint': 'No command configured',
       'row.enabled': 'Enabled',
-      'editor.create': 'Add connector',
-      'editor.edit': 'Edit connector',
+      'editor.create.title': 'New MCP server',
+      'editor.create.subtitle': 'Fill in the new MCP configuration; saving returns to the list.',
+      'editor.edit.title': 'Edit MCP server',
+      'editor.edit.subtitle': 'Save your changes to return to the list.',
+      'editor.scope': 'Scope',
+      'editor.scopeValue': 'Local · User',
+      'editor.scopeHint': 'The configuration lives in the current DSH profile and applies to every session on this machine.',
+      'mode.form': 'Form',
+      'mode.json': 'JSON',
       'field.name': 'Name',
       'field.name.hint': 'Tool prefix: letters, digits, underscore, or hyphen, at most 32 characters.',
-      'field.label': 'Display name',
-      'field.label.hint': 'Optional, shown only in this panel.',
-      'field.transport': 'Transport',
+      'field.label': 'Display name (optional)',
+      'field.label.hint': 'Shown only in this panel.',
+      'field.type': 'Type',
+      'type.stdio': 'stdio (local command)',
+      'type.http': 'HTTP (remote server)',
+      'field.timeout': 'Timeout MS',
+      'field.timeout.hint': 'Leave empty for the default 60000.',
       'field.command': 'Command',
-      'field.command.hint': 'For example npx.',
-      'field.args': 'Arguments',
-      'field.args.hint': 'One argument per line.',
-      'field.env': 'Environment',
-      'field.env.hint': 'One KEY=VALUE per line; sensitive parent variables are not passed through.',
-      'field.cwd': 'Working directory',
-      'field.cwd.hint': 'Optional.',
+      'field.args': 'Arguments (space separated)',
+      'field.args.hint': 'Quote arguments that contain spaces.',
+      'field.env': 'Environment (optional)',
+      'field.env.hint': 'A JSON object; may be empty.',
       'field.url': 'Server URL',
-      'field.headers': 'Headers',
-      'field.headers.hint': 'One KEY=VALUE per line.',
-      'field.enabled': 'Enabled',
+      'field.headers': 'Headers (optional)',
+      'field.headers.hint': 'A JSON object; may be empty.',
+      'field.json': 'Full configuration',
+      'json.hint': 'Paste {"server-name": {…}} or {"mcpServers": {"server-name": {…}}} directly.',
       'action.save': 'Save',
       'action.saving': 'Saving…',
+      'action.cancel': 'Cancel',
       'notice.saved': 'Saved — the connector is connecting.',
       'error.name': 'Names use letters, digits, underscore, or hyphen, 1–32 characters.',
       'error.duplicate': 'A connector with this name already exists.',
       'error.command': 'A command is required.',
       'error.url': 'A server URL starting with http:// or https:// is required.',
-      'error.pairs': 'Every line must be KEY=VALUE.',
+      'error.timeout': 'The timeout must be a positive integer.',
+      'error.type': 'Type must be stdio or http.',
+      'error.json': 'The JSON is malformed.',
+      'error.jsonObject': 'A JSON object is required.',
+      'error.jsonValue': 'Field values must be strings or objects.',
+      'error.jsonEmpty': 'At least one server configuration is required.',
+      'error.jsonSingle': 'Keep exactly one server configuration before switching back to the form.',
+      'error.quote': 'A quote is not closed.',
       'error.load': 'Could not read the connector configuration.',
       'error.save': 'Could not save.',
       'error.noEntry': 'The connector configuration entry is not available yet.',
@@ -183,6 +221,110 @@ window.__ModuleLoader__.load({
       })
     }
 
+    // ---------------------------------------------------------------- values
+
+    /** Split a space-separated argument string, honouring quotes and escapes. */
+    function parseArgsText(text) {
+      const out = []
+      const source = String(text ?? '')
+      let current = ''
+      let pending = false
+      let quote = ''
+      for (let index = 0; index < source.length; index += 1) {
+        const char = source[index]
+        if (quote !== '') {
+          if (char === '\\' && index + 1 < source.length && (source[index + 1] === quote || source[index + 1] === '\\')) {
+            current += source[index + 1]
+            index += 1
+            continue
+          }
+          if (char === quote) {
+            quote = ''
+            continue
+          }
+          current += char
+          continue
+        }
+        if (char === '"' || char === "'") {
+          quote = char
+          pending = true
+          continue
+        }
+        if (/\s/.test(char)) {
+          if (pending) {
+            out.push(current)
+            current = ''
+            pending = false
+          }
+          continue
+        }
+        current += char
+        pending = true
+      }
+      if (quote !== '') throw new Error('error.quote')
+      if (pending) out.push(current)
+      return out
+    }
+
+    /** Render arguments as one line, quoting what the parser would split. */
+    function formatArgsText(args) {
+      return (Array.isArray(args) ? args : [])
+        .map((entry) => {
+          const text = String(entry)
+          return /[\s"']/u.test(text) ? `"${text.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : text
+        })
+        .join(' ')
+    }
+
+    /** String dictionary for a bridge field; numbers and booleans become text. */
+    function dictOf(value) {
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('error.jsonValue')
+      const out = {}
+      for (const [key, entry] of Object.entries(value)) {
+        if (typeof entry === 'string') out[key] = entry
+        else if (typeof entry === 'number' || typeof entry === 'boolean') out[key] = String(entry)
+        else throw new Error('error.jsonValue')
+      }
+      return out
+    }
+
+    /** Parse an env/header textarea; an empty box means "no entries". */
+    function parseObjectText(text) {
+      const trimmed = String(text ?? '').trim()
+      if (trimmed === '') return {}
+      let value
+      try {
+        value = JSON.parse(trimmed)
+      } catch {
+        throw new Error('error.json')
+      }
+      return dictOf(value)
+    }
+
+    /** Render an env/header dictionary into a textarea. */
+    function formatObjectText(value) {
+      if (value === null || typeof value !== 'object') return ''
+      const keys = Object.keys(value)
+      if (keys.length === 0) return ''
+      return JSON.stringify(value, null, 2)
+    }
+
+    function safeArgsText(text) {
+      try {
+        return parseArgsText(text)
+      } catch {
+        return []
+      }
+    }
+
+    function safeObjectText(text) {
+      try {
+        return parseObjectText(text)
+      } catch {
+        return {}
+      }
+    }
+
     const EMPTY_FORM = {
       name: '',
       label: '',
@@ -193,52 +335,37 @@ window.__ModuleLoader__.load({
       cwd: '',
       url: '',
       headersText: '',
+      timeoutText: '',
       enabled: true,
     }
 
     /** Editable form state for one stored connector. */
-    function toForm(server) {
+    function formFromServer(server) {
       return {
         name: typeof server?.name === 'string' ? server.name : '',
         label: typeof server?.label === 'string' ? server.label : '',
         transport: server?.transport === 'streamable-http' ? 'streamable-http' : 'stdio',
         command: typeof server?.command === 'string' ? server.command : '',
-        argsText: Array.isArray(server?.args) ? server.args.filter((entry) => typeof entry === 'string').join('\n') : '',
-        envText: pairsToText(server?.env),
+        argsText: formatArgsText(server?.args),
+        envText: formatObjectText(server?.env),
         cwd: typeof server?.cwd === 'string' ? server.cwd : '',
         url: typeof server?.url === 'string' ? server.url : '',
-        headersText: pairsToText(server?.headers),
+        headersText: formatObjectText(server?.headers),
+        timeoutText: Number(server?.timeoutMs) > 0 ? String(server.timeoutMs) : '',
         enabled: server?.enabled !== false,
       }
     }
 
-    function pairsToText(value) {
-      if (value === null || typeof value !== 'object' || Array.isArray(value)) return ''
-      return Object.entries(value)
-        .filter(([, entry]) => typeof entry === 'string')
-        .map(([key, entry]) => `${key}=${entry}`)
-        .join('\n')
-    }
-
-    /** Parse KEY=VALUE lines; throws when a line is malformed. */
-    function textToPairs(text) {
-      const out = {}
-      for (const raw of String(text ?? '').split(/\r?\n/)) {
-        const line = raw.trim()
-        if (line === '') continue
-        const at = line.indexOf('=')
-        if (at <= 0) throw new Error('pairs')
-        const key = line.slice(0, at).trim()
-        if (key === '') throw new Error('pairs')
-        out[key] = line.slice(at + 1).trim()
-      }
-      return out
-    }
-
     /** Stored connector out of form state; throws a message key when invalid. */
-    function fromForm(form) {
+    function serverFromForm(form) {
       const name = form.name.trim()
       if (!NAME_PATTERN.test(name)) throw new Error('error.name')
+      const timeoutText = String(form.timeoutText ?? '').trim()
+      let timeoutMs = 0
+      if (timeoutText !== '') {
+        if (!/^\d+$/u.test(timeoutText) || Number(timeoutText) <= 0) throw new Error('error.timeout')
+        timeoutMs = Number(timeoutText)
+      }
       if (form.transport === 'streamable-http') {
         const url = form.url.trim()
         if (!URL_PATTERN.test(url)) throw new Error('error.url')
@@ -251,7 +378,8 @@ window.__ModuleLoader__.load({
           env: {},
           cwd: '',
           url,
-          headers: textToPairs(form.headersText),
+          headers: parseObjectText(form.headersText),
+          timeoutMs,
           enabled: form.enabled !== false,
         }
       }
@@ -262,16 +390,117 @@ window.__ModuleLoader__.load({
         label: form.label.trim(),
         transport: 'stdio',
         command,
-        args: String(form.argsText ?? '')
-          .split(/\r?\n/)
-          .map((line) => line.trim())
-          .filter((line) => line !== ''),
-        env: textToPairs(form.envText),
+        args: parseArgsText(form.argsText),
+        env: parseObjectText(form.envText),
         cwd: form.cwd.trim(),
         url: '',
         headers: {},
+        timeoutMs,
         enabled: form.enabled !== false,
       }
+    }
+
+    /** Full-config JSON for one connector, the shape the JSON tab edits. */
+    function serializeServer(name, server) {
+      const body = {}
+      if (server.transport === 'streamable-http') {
+        body.type = 'http'
+        body.url = server.url
+        body.headers = server.headers ?? {}
+      } else {
+        body.type = 'stdio'
+        body.command = server.command
+        body.args = server.args ?? []
+        body.env = server.env ?? {}
+      }
+      if (server.label) body.label = server.label
+      if (Number(server.timeoutMs) > 0) body.timeout = Number(server.timeoutMs)
+      if (server.enabled === false) body.enabled = false
+      return body
+    }
+
+    /** Connector out of one JSON entry; keeps prior display fields when absent. */
+    function serverFromJson(name, config, previous) {
+      if (config === null || typeof config !== 'object' || Array.isArray(config)) throw new Error('error.jsonValue')
+      const rawType = String(config.type ?? config.transport ?? (config.url !== undefined ? 'http' : 'stdio')).toLowerCase()
+      let transport
+      if (rawType === 'stdio') transport = 'stdio'
+      else if (rawType === 'http' || rawType === 'streamable-http' || rawType === 'streamablehttp') transport = 'streamable-http'
+      else throw new Error('error.type')
+      const args = Array.isArray(config.args)
+        ? config.args.map((entry) => String(entry))
+        : typeof config.args === 'string'
+          ? parseArgsText(config.args)
+          : []
+      const timeout = Number(config.timeout ?? config.toolCallTimeoutMs ?? 0)
+      const server = {
+        name: String(config.name ?? name).trim(),
+        label: typeof config.label === 'string' ? config.label : previous?.label ?? '',
+        transport,
+        command: transport === 'stdio' ? String(config.command ?? '').trim() : '',
+        args: transport === 'stdio' ? args : [],
+        env: transport === 'stdio' && config.env !== undefined ? dictOf(config.env) : {},
+        cwd: typeof config.cwd === 'string' ? config.cwd : previous?.cwd ?? '',
+        url: transport === 'streamable-http' ? String(config.url ?? '').trim() : '',
+        headers: transport === 'streamable-http' && config.headers !== undefined ? dictOf(config.headers) : {},
+        timeoutMs: Number.isFinite(timeout) && timeout > 0 ? Math.round(timeout) : 0,
+        enabled: config.enabled === undefined ? previous?.enabled !== false : config.enabled !== false,
+      }
+      if (!NAME_PATTERN.test(server.name)) throw new Error('error.name')
+      if (transport === 'stdio' && server.command === '') throw new Error('error.command')
+      if (transport === 'streamable-http' && !URL_PATTERN.test(server.url)) throw new Error('error.url')
+      return server
+    }
+
+    /** Parse a pasted server map, accepting the `mcpServers` envelope too. */
+    function parseServerMap(text) {
+      let value
+      try {
+        value = JSON.parse(String(text ?? ''))
+      } catch {
+        throw new Error('error.json')
+      }
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('error.jsonObject')
+      const map = value.mcpServers !== null && typeof value.mcpServers === 'object' && !Array.isArray(value.mcpServers)
+        ? value.mcpServers
+        : value
+      const entries = Object.entries(map)
+      if (entries.length === 0) throw new Error('error.jsonEmpty')
+      const servers = []
+      for (const [name, config] of entries) {
+        const server = serverFromJson(name, config, undefined)
+        if (!NAME_PATTERN.test(server.name)) throw new Error('error.name')
+        servers.push(server)
+      }
+      return servers
+    }
+
+    /** Form state out of the JSON tab; requires exactly one server. */
+    function formFromJsonText(text) {
+      const servers = parseServerMap(text)
+      if (servers.length !== 1) throw new Error('error.jsonSingle')
+      return formFromServer(servers[0])
+    }
+
+    /** JSON text for the JSON tab, derived from the current form. */
+    function jsonFromForm(form) {
+      const name = form.name.trim() || 'my-mcp-server'
+      let body
+      if (form.transport === 'streamable-http') {
+        body = { type: 'http', url: form.url.trim(), headers: safeObjectText(form.headersText) }
+      } else {
+        body = {
+          type: 'stdio',
+          command: form.command.trim(),
+          args: safeArgsText(form.argsText),
+          env: safeObjectText(form.envText),
+        }
+      }
+      if (form.label.trim() !== '') body.label = form.label.trim()
+      const timeoutText = String(form.timeoutText ?? '').trim()
+      if (timeoutText !== '') body.timeout = Number(timeoutText) > 0 ? Number(timeoutText) : timeoutText
+      if (form.enabled === false) body.enabled = false
+      return JSON.stringify({ [name]: body }, null, 2)
     }
 
     /** Endpoint summary shown under a connector name. */
@@ -281,6 +510,8 @@ window.__ModuleLoader__.load({
       const args = Array.isArray(server.args) ? server.args.filter((entry) => typeof entry === 'string') : []
       return [command, ...args].filter((entry) => entry !== '').join(' ')
     }
+
+    // ------------------------------------------------------------ components
 
     function Switch({ checked, disabled, label, onChange }) {
       return h(
@@ -302,150 +533,99 @@ window.__ModuleLoader__.load({
       )
     }
 
-    function Field({ label, hint, children }) {
+    function Segment({ value, options, onChange, large }) {
       return h(
-        'label',
-        { className: 'dsh-mcp-field' },
+        'div',
+        { className: `dsh-mcp-segment${large ? ' is-large' : ''}`, role: 'group' },
+        options.map((option) =>
+          h(
+            'button',
+            {
+              key: option.value,
+              type: 'button',
+              className: `dsh-mcp-segment-item${value === option.value ? ' is-active' : ''}`,
+              'aria-pressed': value === option.value ? 'true' : 'false',
+              onClick: () => onChange(option.value),
+            },
+            option.label,
+          ),
+        ),
+      )
+    }
+
+    function Field({ label, hint, narrow, plain, children }) {
+      return h(
+        plain ? 'div' : 'label',
+        { className: `dsh-mcp-field${narrow ? ' is-narrow' : ''}` },
         h('span', { className: 'dsh-mcp-field-label' }, label),
         children,
         hint ? h('span', { className: 'dsh-mcp-field-hint' }, hint) : null,
       )
     }
 
-    function Editor({ t, form, error, busy, onChange, onSubmit, onCancel }) {
-      const set = (patch) => onChange({ ...form, ...patch })
-      const input = (key, extra) =>
-        h('input', {
-          className: 'dsh-mcp-input',
-          value: form[key],
-          spellCheck: false,
-          autoComplete: 'off',
-          onChange: (event) => set({ [key]: event.target.value }),
-          ...extra,
-        })
+    function MonitorIcon() {
       return h(
-        'form',
+        'svg',
         {
-          className: 'dsh-mcp-card dsh-mcp-editor',
-          onSubmit: (event) => {
-            event.preventDefault()
-            onSubmit()
-          },
+          viewBox: '0 0 16 16',
+          width: 14,
+          height: 14,
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 1.2,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          'aria-hidden': true,
+          style: { display: 'block' },
         },
+        h('rect', { x: 2, y: 3, width: 12, height: 8, rx: 1.5 }),
+        h('path', { d: 'M8 11v2.1' }),
+        h('path', { d: 'M5.6 13.1h4.8' }),
+      )
+    }
+
+    function Chevron({ open }) {
+      return h(
+        'svg',
+        {
+          viewBox: '0 0 16 16',
+          width: 12,
+          height: 12,
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: 1.4,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          'aria-hidden': true,
+          style: { display: 'block' },
+        },
+        h('path', { d: open ? 'M4 10l4-4 4 4' : 'M4 6l4 4 4-4' }),
+      )
+    }
+
+    function Collapsible({ title, hint, open, onToggle, children }) {
+      return h(
+        'div',
+        { className: 'dsh-mcp-collapse' },
         h(
-          'div',
-          { className: 'dsh-mcp-editor-head' },
-          h('h2', { className: 'dsh-mcp-editor-title' }, form.editingLabel),
+          'button',
+          {
+            type: 'button',
+            className: 'dsh-mcp-collapse-head',
+            'aria-expanded': open ? 'true' : 'false',
+            onClick: onToggle,
+          },
+          h(Chevron, { open }),
+          h('span', {}, title),
         ),
-        h(
-          'div',
-          { className: 'dsh-mcp-grid' },
-          h(
-            Field,
-            { label: t('field.name'), hint: t('field.name.hint') },
-            input('name', { placeholder: 'github' }),
-          ),
-          h(Field, { label: t('field.label'), hint: t('field.label.hint') }, input('label')),
-          h(
-            Field,
-            { label: t('field.transport') },
-            h(
-              'div',
-              { className: 'dsh-mcp-segment', role: 'group' },
-              ['stdio', 'streamable-http'].map((value) =>
-                h(
-                  'button',
-                  {
-                    key: value,
-                    type: 'button',
-                    className: `dsh-mcp-segment-item${form.transport === value ? ' is-active' : ''}`,
-                    'aria-pressed': form.transport === value ? 'true' : 'false',
-                    onClick: () => set({ transport: value }),
-                  },
-                  value === 'stdio' ? 'stdio' : 'HTTP',
-                ),
-              ),
-            ),
-          ),
-        ),
-        form.transport === 'streamable-http'
+        open
           ? h(
               'div',
-              { className: 'dsh-mcp-grid' },
-              h(Field, { label: t('field.url') }, input('url', { placeholder: 'https://example.com/mcp' })),
-              h(
-                Field,
-                { label: t('field.headers'), hint: t('field.headers.hint') },
-                h('textarea', {
-                  className: 'dsh-mcp-input dsh-mcp-textarea',
-                  rows: 3,
-                  value: form.headersText,
-                  spellCheck: false,
-                  placeholder: 'Authorization=Bearer …',
-                  onChange: (event) => set({ headersText: event.target.value }),
-                }),
-              ),
+              { className: 'dsh-mcp-collapse-body' },
+              children,
+              hint ? h('span', { className: 'dsh-mcp-field-hint' }, hint) : null,
             )
-          : h(
-              'div',
-              { className: 'dsh-mcp-grid' },
-              h(Field, { label: t('field.command'), hint: t('field.command.hint') }, input('command', { placeholder: 'npx' })),
-              h(
-                Field,
-                { label: t('field.args'), hint: t('field.args.hint') },
-                h('textarea', {
-                  className: 'dsh-mcp-input dsh-mcp-textarea',
-                  rows: 3,
-                  value: form.argsText,
-                  spellCheck: false,
-                  placeholder: '-y\n@modelcontextprotocol/server-github',
-                  onChange: (event) => set({ argsText: event.target.value }),
-                }),
-              ),
-              h(
-                Field,
-                { label: t('field.env'), hint: t('field.env.hint') },
-                h('textarea', {
-                  className: 'dsh-mcp-input dsh-mcp-textarea',
-                  rows: 3,
-                  value: form.envText,
-                  spellCheck: false,
-                  placeholder: 'GITHUB_TOKEN=…',
-                  onChange: (event) => set({ envText: event.target.value }),
-                }),
-              ),
-              h(Field, { label: t('field.cwd'), hint: t('field.cwd.hint') }, input('cwd')),
-            ),
-        error ? h('p', { className: 'dsh-mcp-error', role: 'alert' }, error) : null,
-        h(
-          'div',
-          { className: 'dsh-mcp-editor-foot' },
-          h(
-            'label',
-            { className: 'dsh-mcp-inline' },
-            h(Switch, {
-              checked: form.enabled,
-              disabled: busy,
-              label: t('field.enabled'),
-              onChange: (value) => set({ enabled: value }),
-            }),
-            h('span', {}, t('field.enabled')),
-          ),
-          h(
-            'div',
-            { className: 'dsh-mcp-editor-actions' },
-            h(
-              'button',
-              { type: 'button', className: 'dsh-mcp-btn dsh-mcp-btn-ghost', onClick: onCancel, disabled: busy },
-              t('row.cancel'),
-            ),
-            h(
-              'button',
-              { type: 'submit', className: 'dsh-mcp-btn dsh-mcp-btn-primary', disabled: busy },
-              busy ? t('action.saving') : t('action.save'),
-            ),
-          ),
-        ),
+          : null,
       )
     }
 
@@ -500,15 +680,6 @@ window.__ModuleLoader__.load({
         }
       }, [locale])
 
-      useEffect(() => {
-        if (typeof subscribeSettings !== 'function') return undefined
-        return subscribeSettings(() => {
-          load()
-        })
-        // Refresh follows the saved document; the loader closure is per mount.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [])
-
       const load = async () => {
         if (settings === undefined) {
           setStatus('error')
@@ -550,7 +721,15 @@ window.__ModuleLoader__.load({
 
       useEffect(() => {
         load()
-        // The panel loads once per mount; saves reload explicitly.
+        // The panel loads once per mount; saves and forwarded document updates reload it.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [])
+
+      useEffect(() => {
+        if (typeof subscribeSettings !== 'function') return undefined
+        return subscribeSettings(() => {
+          load()
+        })
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [])
 
@@ -589,24 +768,69 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const submitDraft = async () => {
-        let stored
-        try {
-          stored = fromForm(draft.form)
-        } catch (caught) {
-          setDraft({ ...draft, error: t(caught.message === 'pairs' ? 'error.pairs' : caught.message) })
+      const openEditor = (index) => {
+        setNotice('')
+        setError('')
+        setConfirmIndex(null)
+        const form = index === null ? { ...EMPTY_FORM } : formFromServer(servers[index])
+        setDraft({
+          index,
+          mode: 'form',
+          form,
+          jsonText: jsonFromForm(form),
+          error: '',
+          envOpen: false,
+          headersOpen: form.transport === 'streamable-http' && form.headersText !== '',
+        })
+      }
+
+      const patchDraft = (patch) => setDraft((current) => (current === null ? current : { ...current, error: '', ...patch }))
+
+      const switchMode = (mode) => {
+        if (draft === null || mode === draft.mode) return
+        if (mode === 'json') {
+          patchDraft({ mode: 'json', jsonText: jsonFromForm(draft.form) })
           return
         }
-        const clash = servers.some(
-          (entry, index) => index !== draft.index && entry && entry.name === stored.name,
-        )
-        if (clash) {
-          setDraft({ ...draft, error: t('error.duplicate') })
+        try {
+          const form = formFromJsonText(draft.jsonText)
+          patchDraft({ mode: 'form', form, envOpen: false, headersOpen: false })
+        } catch (caught) {
+          patchDraft({ error: t(caught.message) })
+        }
+      }
+
+      const saveDraft = async () => {
+        if (draft === null) return
+        let incoming
+        try {
+          if (draft.mode === 'json') incoming = parseServerMap(draft.jsonText)
+          else incoming = [serverFromForm(draft.form)]
+        } catch (caught) {
+          patchDraft({ error: t(caught.message) })
           return
+        }
+        if (draft.mode === 'form') {
+          const stored = incoming[0]
+          const clash = servers.findIndex((entry, index) => index !== draft.index && entry && entry.name === stored.name)
+          if (clash >= 0) {
+            patchDraft({ error: t('error.duplicate') })
+            return
+          }
         }
         const next = servers.slice()
-        if (draft.index === null) next.push(stored)
-        else next[draft.index] = stored
+        for (const stored of incoming) {
+          const at = next.findIndex((entry) => entry && entry.name === stored.name)
+          if (at >= 0) next[at] = stored
+          else next.push(stored)
+        }
+        if (draft.index !== null) {
+          const previousName = servers[draft.index]?.name
+          if (previousName && !incoming.some((entry) => entry.name === previousName)) {
+            const at = next.findIndex((entry) => entry && entry.name === previousName)
+            if (at >= 0) next.splice(at, 1)
+          }
+        }
         if (await persist(next)) setDraft(null)
       }
 
@@ -625,14 +849,230 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const openEditor = (index) => {
-        setNotice('')
-        setError('')
-        setConfirmIndex(null)
-        const form = index === null ? { ...EMPTY_FORM } : toForm(servers[index])
-        setDraft({ index, form, error: '', editingLabel: t(index === null ? 'editor.create' : 'editor.edit') })
+      // ------------------------------------------------------------ editor
+      if (draft !== null) {
+        const form = draft.form
+        const setForm = (patch) => patchDraft({ form: { ...form, ...patch } })
+        const modeSegment = h(Segment, {
+          value: draft.mode,
+          large: true,
+          options: [
+            { value: 'form', label: t('mode.form') },
+            { value: 'json', label: t('mode.json') },
+          ],
+          onChange: switchMode,
+        })
+        const text = (key, placeholder, extra) =>
+          h('input', {
+            className: 'dsh-mcp-input',
+            value: form[key],
+            spellCheck: false,
+            autoComplete: 'off',
+            placeholder,
+            onChange: (event) => setForm({ [key]: event.target.value }),
+            ...extra,
+          })
+        const jsonBody = h(
+          'div',
+          { className: 'dsh-mcp-form-body' },
+          h(
+            Field,
+            { label: t('field.json') },
+            h('textarea', {
+              className: 'dsh-mcp-input dsh-mcp-json',
+              value: draft.jsonText,
+              spellCheck: false,
+              rows: 12,
+              'aria-label': t('field.json'),
+              onChange: (event) => patchDraft({ jsonText: event.target.value }),
+            }),
+          ),
+          h('p', { className: 'dsh-mcp-hint' }, t('json.hint')),
+        )
+        const formBody = h(
+          'div',
+          { className: 'dsh-mcp-form-body' },
+          h(
+            'div',
+            { className: 'dsh-mcp-name-row' },
+            h(
+              'div',
+              { className: 'dsh-mcp-name-field' },
+              h('span', { className: 'dsh-mcp-field-label' }, t('field.name')),
+              h('input', {
+                className: 'dsh-mcp-input',
+                value: form.name,
+                spellCheck: false,
+                autoComplete: 'off',
+                placeholder: 'my-mcp-server',
+                'aria-label': t('field.name'),
+                onChange: (event) => setForm({ name: event.target.value }),
+              }),
+              h('span', { className: 'dsh-mcp-field-hint' }, t('field.name.hint')),
+            ),
+            h(
+              'div',
+              { className: 'dsh-mcp-scope', title: t('editor.scopeHint') },
+              h('span', { className: 'dsh-mcp-scope-label' }, t('editor.scope')),
+              h(
+                'span',
+                { className: 'dsh-mcp-scope-chip' },
+                h(MonitorIcon),
+                h('span', {}, t('editor.scopeValue')),
+              ),
+            ),
+          ),
+          h(
+            Field,
+            { label: t('field.label'), hint: t('field.label.hint'), narrow: true },
+            text('label'),
+          ),
+          h(
+            Field,
+            { label: t('field.type'), plain: true },
+            h(Segment, {
+              value: form.transport,
+              options: [
+                { value: 'stdio', label: t('type.stdio') },
+                { value: 'streamable-http', label: t('type.http') },
+              ],
+              onChange: (value) => setForm({ transport: value }),
+            }),
+          ),
+          h(
+            Field,
+            { label: t('field.timeout'), hint: t('field.timeout.hint'), narrow: true },
+            h('input', {
+              className: 'dsh-mcp-input',
+              value: form.timeoutText,
+              inputMode: 'numeric',
+              spellCheck: false,
+              autoComplete: 'off',
+              placeholder: '60000',
+              onChange: (event) => setForm({ timeoutText: event.target.value }),
+            }),
+          ),
+          form.transport === 'streamable-http'
+            ? [
+                h(
+                  Field,
+                  { key: 'url', label: t('field.url') },
+                  text('url', 'https://example.com/mcp'),
+                ),
+                h(
+                  Collapsible,
+                  {
+                    key: 'headers',
+                    title: t('field.headers'),
+                    hint: t('field.headers.hint'),
+                    open: draft.headersOpen,
+                    onToggle: () => patchDraft({ headersOpen: !draft.headersOpen }),
+                  },
+                  h('textarea', {
+                    className: 'dsh-mcp-input dsh-mcp-json',
+                    value: form.headersText,
+                    spellCheck: false,
+                    rows: 5,
+                    'aria-label': t('field.headers'),
+                    placeholder: '{\n  "Authorization": "Bearer …"\n}',
+                    onChange: (event) => setForm({ headersText: event.target.value }),
+                  }),
+                ),
+              ]
+            : [
+                h(
+                  Field,
+                  { key: 'command', label: t('field.command') },
+                  text('command', 'npx'),
+                ),
+                h(
+                  Field,
+                  { key: 'args', label: t('field.args'), hint: t('field.args.hint') },
+                  text('argsText', '-y @modelcontextprotocol/server-memory'),
+                ),
+                h(
+                  Collapsible,
+                  {
+                    key: 'env',
+                    title: t('field.env'),
+                    hint: t('field.env.hint'),
+                    open: draft.envOpen,
+                    onToggle: () => patchDraft({ envOpen: !draft.envOpen }),
+                  },
+                  h('textarea', {
+                    className: 'dsh-mcp-input dsh-mcp-json',
+                    value: form.envText,
+                    spellCheck: false,
+                    rows: 5,
+                    'aria-label': t('field.env'),
+                    placeholder: '{\n  "MY_API_KEY": "your-key"\n}',
+                    onChange: (event) => setForm({ envText: event.target.value }),
+                  }),
+                ),
+              ],
+        )
+        return h(
+          'div',
+          { className: 'dsh-mcp-page' },
+          h(StyleSheet),
+          h(
+            'div',
+            { className: 'dsh-mcp-inner' },
+            h(
+              'header',
+              { className: 'dsh-mcp-head' },
+              h(
+                'div',
+                { className: 'dsh-mcp-heading' },
+                h(
+                  'h1',
+                  { className: 'dsh-mcp-title' },
+                  t(draft.index === null ? 'editor.create.title' : 'editor.edit.title'),
+                ),
+                h(
+                  'p',
+                  { className: 'dsh-mcp-sub' },
+                  t(draft.index === null ? 'editor.create.subtitle' : 'editor.edit.subtitle'),
+                ),
+              ),
+              h('div', { className: 'dsh-mcp-head-actions' }, modeSegment),
+            ),
+            h(
+              'form',
+              {
+                className: 'dsh-mcp-card dsh-mcp-form',
+                onSubmit: (event) => {
+                  event.preventDefault()
+                  saveDraft()
+                },
+              },
+              draft.mode === 'json' ? jsonBody : formBody,
+              draft.error ? h('p', { className: 'dsh-mcp-error', role: 'alert' }, draft.error) : null,
+              h(
+                'div',
+                { className: 'dsh-mcp-form-foot' },
+                h(
+                  'button',
+                  { type: 'submit', className: 'dsh-mcp-btn dsh-mcp-btn-primary', disabled: busy },
+                  busy ? t('action.saving') : t('action.save'),
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'dsh-mcp-btn dsh-mcp-btn-ghost',
+                    disabled: busy,
+                    onClick: () => setDraft(null),
+                  },
+                  t('action.cancel'),
+                ),
+              ),
+            ),
+          ),
+        )
       }
 
+      // -------------------------------------------------------------- list
       const headerActions =
         status === 'ready'
           ? [
@@ -685,7 +1125,7 @@ window.__ModuleLoader__.load({
             t('page.retry'),
           ),
         )
-      } else if (draft === null && servers.length === 0) {
+      } else if (servers.length === 0) {
         body = h(
           'div',
           { className: 'dsh-mcp-card dsh-mcp-empty' },
@@ -706,109 +1146,92 @@ window.__ModuleLoader__.load({
         body = h(
           'div',
           { className: 'dsh-mcp-list' },
-          draft !== null
-            ? h(Editor, {
-                t,
-                form: draft.form,
-                error: draft.error,
-                busy,
-                onChange: (form) => setDraft({ ...draft, form, error: '' }),
-                onSubmit: submitDraft,
-                onCancel: () => setDraft(null),
-              })
-            : null,
           h(
             'div',
             { className: 'dsh-mcp-card' },
-            servers.length === 0
-              ? h('p', { className: 'dsh-mcp-empty-inline' }, t('empty.title'))
-              : servers.map((server, index) =>
+            servers.map((server, index) =>
+              h(
+                'div',
+                { className: 'dsh-mcp-row', key: `${server?.name ?? 'connector'}-${index}` },
+                h(
+                  'div',
+                  { className: 'dsh-mcp-row-main' },
                   h(
                     'div',
-                    { className: 'dsh-mcp-row', key: `${server?.name ?? 'connector'}-${index}` },
+                    { className: 'dsh-mcp-row-title' },
+                    h('span', { className: 'dsh-mcp-name' }, server?.name || t('row.unnamed')),
+                    server?.label ? h('span', { className: 'dsh-mcp-label' }, server.label) : null,
                     h(
-                      'div',
-                      { className: 'dsh-mcp-row-main' },
-                      h(
-                        'div',
-                        { className: 'dsh-mcp-row-title' },
-                        h('span', { className: 'dsh-mcp-name' }, server?.name || t('row.unnamed')),
-                        server?.label ? h('span', { className: 'dsh-mcp-label' }, server.label) : null,
-                        h(
-                          'span',
-                          { className: 'dsh-mcp-tag' },
-                          server?.transport === 'streamable-http' ? 'HTTP' : 'stdio',
-                        ),
-                      ),
-                      h(
-                        'div',
-                        { className: 'dsh-mcp-row-sub' },
-                        endpointOf(server) || t('row.noEndpoint'),
-                      ),
-                    ),
-                    h(
-                      'div',
-                      { className: 'dsh-mcp-row-actions' },
-                      confirmIndex === index
-                        ? [
-                            h('span', { key: 'ask', className: 'dsh-mcp-confirm' }, t('row.confirm')),
-                            h(
-                              'button',
-                              {
-                                key: 'yes',
-                                type: 'button',
-                                className: 'dsh-mcp-btn dsh-mcp-btn-danger',
-                                disabled: busy,
-                                onClick: () => removeServer(index),
-                              },
-                              t('row.delete'),
-                            ),
-                            h(
-                              'button',
-                              {
-                                key: 'no',
-                                type: 'button',
-                                className: 'dsh-mcp-btn dsh-mcp-btn-ghost',
-                                disabled: busy,
-                                onClick: () => setConfirmIndex(null),
-                              },
-                              t('row.cancel'),
-                            ),
-                          ]
-                        : [
-                            h(Switch, {
-                              key: 'switch',
-                              checked: server?.enabled !== false,
-                              disabled: busy || view.writable === false,
-                              label: t('row.enabled'),
-                              onChange: (value) => toggleServer(index, value),
-                            }),
-                            h(
-                              'button',
-                              {
-                                key: 'edit',
-                                type: 'button',
-                                className: 'dsh-mcp-btn dsh-mcp-btn-ghost',
-                                disabled: busy || view.writable === false,
-                                onClick: () => openEditor(index),
-                              },
-                              t('row.edit'),
-                            ),
-                            h(
-                              'button',
-                              {
-                                key: 'delete',
-                                type: 'button',
-                                className: 'dsh-mcp-btn dsh-mcp-btn-ghost dsh-mcp-btn-danger',
-                                disabled: busy || view.writable === false,
-                                onClick: () => setConfirmIndex(index),
-                              },
-                              t('row.delete'),
-                            ),
-                          ],
+                      'span',
+                      { className: 'dsh-mcp-tag' },
+                      server?.transport === 'streamable-http' ? 'HTTP' : 'stdio',
                     ),
                   ),
+                  h('div', { className: 'dsh-mcp-row-sub' }, endpointOf(server) || t('row.noEndpoint')),
                 ),
+                h(
+                  'div',
+                  { className: 'dsh-mcp-row-actions' },
+                  confirmIndex === index
+                    ? [
+                        h('span', { key: 'ask', className: 'dsh-mcp-confirm' }, t('row.confirm')),
+                        h(
+                          'button',
+                          {
+                            key: 'yes',
+                            type: 'button',
+                            className: 'dsh-mcp-btn dsh-mcp-btn-danger',
+                            disabled: busy,
+                            onClick: () => removeServer(index),
+                          },
+                          t('row.delete'),
+                        ),
+                        h(
+                          'button',
+                          {
+                            key: 'no',
+                            type: 'button',
+                            className: 'dsh-mcp-btn dsh-mcp-btn-ghost',
+                            disabled: busy,
+                            onClick: () => setConfirmIndex(null),
+                          },
+                          t('row.cancel'),
+                        ),
+                      ]
+                    : [
+                        h(Switch, {
+                          key: 'switch',
+                          checked: server?.enabled !== false,
+                          disabled: busy || view.writable === false,
+                          label: t('row.enabled'),
+                          onChange: (value) => toggleServer(index, value),
+                        }),
+                        h(
+                          'button',
+                          {
+                            key: 'edit',
+                            type: 'button',
+                            className: 'dsh-mcp-btn dsh-mcp-btn-ghost',
+                            disabled: busy || view.writable === false,
+                            onClick: () => openEditor(index),
+                          },
+                          t('row.edit'),
+                        ),
+                        h(
+                          'button',
+                          {
+                            key: 'delete',
+                            type: 'button',
+                            className: 'dsh-mcp-btn dsh-mcp-btn-ghost dsh-mcp-btn-danger',
+                            disabled: busy || view.writable === false,
+                            onClick: () => setConfirmIndex(index),
+                          },
+                          t('row.delete'),
+                        ),
+                      ],
+                ),
+              ),
+            ),
           ),
           h('p', { className: 'dsh-mcp-foot' }, t('footer.note')),
         )
@@ -847,12 +1270,12 @@ window.__ModuleLoader__.load({
 .dsh-mcp-heading{min-width:0}
 .dsh-mcp-title{margin:0;font-size:20px;font-weight:500;line-height:28px}
 .dsh-mcp-sub{margin:4px 0 0;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:20px}
-.dsh-mcp-head-actions{display:flex;gap:8px;flex:none}
+.dsh-mcp-head-actions{display:flex;gap:8px;flex:none;align-items:center}
 .dsh-mcp-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:20px;cursor:pointer;transition:background .12s ease,border-color .12s ease,color .12s ease,opacity .12s ease;white-space:nowrap}
 .dsh-mcp-btn:hover:not(:disabled){background:var(--dsw-alias-bg-layer-2)}
 .dsh-mcp-btn:disabled{opacity:.5;cursor:default}
 .dsh-mcp-btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}
-.dsh-mcp-btn-primary{border-color:transparent;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base)}
+.dsh-mcp-btn-primary{border-color:transparent;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);font-weight:500}
 .dsh-mcp-btn-primary:hover:not(:disabled){background:var(--dsw-alias-brand-primary);opacity:.88}
 .dsh-mcp-btn-ghost{border-color:transparent;color:var(--dsw-alias-label-secondary)}
 .dsh-mcp-btn-ghost:hover:not(:disabled){color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}
@@ -875,32 +1298,41 @@ window.__ModuleLoader__.load({
 .dsh-mcp-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--dsw-alias-label-secondary);transition:transform .12s ease,background .12s ease}
 .dsh-mcp-switch.is-on{border-color:transparent;background:var(--dsw-alias-state-success-primary)}
 .dsh-mcp-switch.is-on .dsh-mcp-knob{transform:translateX(14px);background:var(--dsw-alias-bg-base)}
-.dsh-mcp-editor{padding:18px}
-.dsh-mcp-editor-head{margin-bottom:14px}
-.dsh-mcp-editor-title{margin:0;font-size:15px;font-weight:600}
-.dsh-mcp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:14px}
+.dsh-mcp-form{padding:22px 24px 20px}
+.dsh-mcp-form-body{display:flex;flex-direction:column;gap:18px}
+.dsh-mcp-form-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:22px;padding-top:18px;border-top:1px solid var(--dsw-alias-border-l1)}
+.dsh-mcp-name-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.dsh-mcp-name-field{display:flex;flex-direction:column;gap:6px;max-width:340px;flex:1;min-width:0}
+.dsh-mcp-scope{display:flex;align-items:center;gap:8px;flex:none}
+.dsh-mcp-scope-label{color:var(--dsw-alias-label-secondary);font-size:13px}
+.dsh-mcp-scope-chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-primary);font-size:13px;background:transparent}
 .dsh-mcp-field{display:flex;flex-direction:column;gap:6px;min-width:0}
-.dsh-mcp-field-label{font-size:12.5px;font-weight:500;color:var(--dsw-alias-label-primary)}
+.dsh-mcp-field.is-narrow{max-width:340px}
+.dsh-mcp-field-label{font-size:13px;font-weight:500;color:var(--dsw-alias-label-primary)}
 .dsh-mcp-field-hint{font-size:11.5px;line-height:1.45;color:var(--dsw-alias-label-secondary)}
 .dsh-mcp-input{width:100%;min-height:34px;padding:7px 10px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;outline:none}
 .dsh-mcp-input:focus{border-color:var(--dsw-alias-brand-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 22%,transparent)}
-.dsh-mcp-textarea{resize:vertical;font-family:var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);font-size:12.5px;line-height:1.55}
-.dsh-mcp-segment{display:inline-flex;gap:2px;padding:2px;border-radius:8px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
+.dsh-mcp-json{resize:vertical;font-family:var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);font-size:12.5px;line-height:1.6;min-height:120px}
+.dsh-mcp-segment{display:inline-flex;gap:2px;padding:2px;border-radius:var(--dsw-radius-md, 8px);border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2)}
 .dsh-mcp-segment-item{height:28px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12.5px;cursor:pointer}
-.dsh-mcp-segment-item.is-active{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.dsh-mcp-segment.is-large{padding:3px}
+.dsh-mcp-segment.is-large .dsh-mcp-segment-item{height:30px;padding:0 16px;font-size:13px;border-radius:7px}
+.dsh-mcp-segment-item.is-active{background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);box-shadow:0 1px 2px rgb(0 0 0 / 12%)}
 .dsh-mcp-segment-item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
-.dsh-mcp-editor-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:4px}
-.dsh-mcp-editor-actions{display:flex;gap:8px}
-.dsh-mcp-inline{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dsw-alias-label-secondary)}
-.dsh-mcp-error{margin:0 0 10px;color:var(--dsw-alias-state-error-primary);font-size:12.5px}
+.dsh-mcp-collapse{display:flex;flex-direction:column;gap:10px}
+.dsh-mcp-collapse-head{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;padding:0;border:0;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.dsh-mcp-collapse-head:hover{color:var(--dsw-alias-brand-primary)}
+.dsh-mcp-collapse-head:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;border-radius:4px}
+.dsh-mcp-collapse-body{display:flex;flex-direction:column;gap:6px}
+.dsh-mcp-hint{margin:10px 0 0;color:var(--dsw-alias-label-secondary);font-size:12.5px;line-height:1.5}
+.dsh-mcp-error{margin:16px 0 0;color:var(--dsw-alias-state-error-primary);font-size:12.5px}
 .dsh-mcp-notice{margin:0 0 12px;color:var(--dsw-alias-state-success-primary);font-size:12.5px}
 .dsh-mcp-muted{color:var(--dsw-alias-label-secondary);font-size:13px}
 .dsh-mcp-empty{display:flex;flex-direction:column;align-items:center;gap:10px;padding:44px 24px;text-align:center}
 .dsh-mcp-empty-title{margin:0;font-size:14px;font-weight:500}
 .dsh-mcp-empty-body{margin:0;max-width:420px;color:var(--dsw-alias-label-secondary);font-size:13px}
-.dsh-mcp-empty-inline{margin:0;padding:18px 16px;color:var(--dsw-alias-label-secondary);font-size:13px}
 .dsh-mcp-foot{margin:14px 0 0;color:var(--dsw-alias-label-secondary);font-size:12px}
-@media (max-width:560px){.dsh-mcp-page{padding:20px 16px 56px}.dsh-mcp-row{flex-direction:column;align-items:stretch;gap:10px}.dsh-mcp-row-actions{justify-content:flex-end}}
+@media (max-width:560px){.dsh-mcp-page{padding:20px 16px 56px}.dsh-mcp-row{flex-direction:column;align-items:stretch;gap:10px}.dsh-mcp-row-actions{justify-content:flex-end}.dsh-mcp-name-row{flex-direction:column;align-items:stretch}.dsh-mcp-scope{justify-content:flex-start}}
 `
 
     function StyleSheet() {

@@ -2,12 +2,15 @@
  * Completion notifications — Web half.
  *
  * The page receives forwarded session events, so a conversation that goes from
- * running to idle is the completion signal. The notification is raised through
- * the Web Notification API, which the desktop shell renders as an Operating
- * System notification (Windows Action Center / macOS Notification Center);
- * nothing is drawn inside the application window.
+ * running to idle is the completion signal. A system notification is shown
+ * through the Web Notification API, which the desktop shell renders as an
+ * Operating System notification (Windows Action Center / macOS Notification
+ * Center); nothing is drawn inside the application window.
  *
- * A short debounce merges the gap between two turns of the same conversation.
+ * The notification is raised only while the window is in the background. The
+ * background state is tracked from `visibilitychange` and window `focus`/`blur`
+ * events rather than probed at fire time: the page's timer can be throttled
+ * while hidden, and a late probe would see a window the user already returned to.
  *
  * @module @local/dsh-notifications/client
  */
@@ -66,6 +69,15 @@ window.__ModuleLoader__.load({
         const timers = new Map()
         /** Notifications kept referenced until they close, so they are not collected. */
         const live = new Set()
+        /** Whether the window is hidden or another window holds the focus. */
+        let inBackground = document.hidden || !document.hasFocus()
+
+        const syncBackground = () => {
+          inBackground = document.hidden || !document.hasFocus()
+        }
+        document.addEventListener('visibilitychange', syncBackground)
+        window.addEventListener('focus', syncBackground)
+        window.addEventListener('blur', syncBackground)
 
         const cancel = (sessionId) => {
           const timer = timers.get(sessionId)
@@ -138,6 +150,7 @@ window.__ModuleLoader__.load({
             const timer = setTimeout(() => {
               timers.delete(sessionId)
               if (running.get(sessionId) === true) return
+              if (!inBackground) return
               show(sessionId)
             }, SETTLE_MS)
             timers.set(sessionId, timer)
@@ -149,6 +162,9 @@ window.__ModuleLoader__.load({
         }
 
         ctx.effect(() => () => {
+          document.removeEventListener('visibilitychange', syncBackground)
+          window.removeEventListener('focus', syncBackground)
+          window.removeEventListener('blur', syncBackground)
           try {
             offAdded?.()
           } catch {}

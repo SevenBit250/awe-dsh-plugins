@@ -33,10 +33,10 @@ pnpm install
 
 ## dsh-notifications
 
-会话从"运行中"转为"空闲"就发一条**系统通知**（Windows 操作中心 / macOS 通知中心）。
+会话从"运行中"转为"空闲"、且窗口在后台（最小化/隐藏/失焦）时，发一条**系统通知**（Windows 操作中心 / macOS 通知中心）。
 
 - 触发：订阅转发事件 `api-session/status`，去抖 800ms 合并同一会话的连续轮次
-- 每次完成都会通知（不再按焦点跳过：焦点判断不可靠，且隐藏窗口的定时器会被节流）
+- 后台判定：由 `visibilitychange` 与窗口 `focus`/`blur` 事件维护一个状态位，**不在触发时临时探测** `hasFocus()`——隐藏窗口的定时器会被节流，晚到的探测会误判成"用户已回来"而丢弃通知
 - 通知对象会保留引用到关闭，避免被 GC 提前回收；不使用 `tag`，避免后一条静默覆盖前一条
 - 点击通知会聚焦窗口并打开该会话
 - 依赖：`dsh.client.inject` 里的 api-remotes（`ctx.remote.$on`）、client-locale；不需要 Host 服务

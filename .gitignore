@@ -12,3 +12,6 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# scratch directories used while inspecting the Harness installation
+_inspect/

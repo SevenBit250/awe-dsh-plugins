@@ -30,3 +30,12 @@ pnpm install
 
 - Host 半区（`index.js`）改动：在 Plugin Manager 里关闭再启用该插件，或重启 DSH。
 - Web 半区（`client.js`）改动：刷新页面（F5）。
+
+## dsh-notifications
+
+窗口在后台时，会话从"运行中"转为"空闲"就发一条**系统通知**（Windows 操作中心 / macOS 通知中心）。
+
+- 触发：订阅转发事件 `api-session/status`，去抖 800ms 合并同一会话的连续轮次
+- 只在前台不可见/窗口失焦时发送；点击通知会聚焦窗口并打开该会话
+- 依赖：`dsh.client.inject` 里的 api-remotes（`ctx.remote.$on`）、client-locale；不需要 Host 服务
+- 已知限制：应用完全退出时不会有通知；子会话（subagent）通过 `api-session/added` 的父会话字段过滤

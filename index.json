@@ -47,7 +47,10 @@
           "version": "1.0.0",
           "publishTimestamp": 1793910449,
           "source": {
-            "type": "npm"
+            "type": "git",
+            "url": "https://github.com/SevenBit250/awe-dsh-plugins",
+            "commit": "73378b130ade2366eb8f4c091a30b5919da2bb9d",
+            "path": "mcp-connectors"
           },
           "engines": {
             "dsh": ">=0.2.2-rc.1 <0.3.0-0"
@@ -77,7 +80,10 @@
           "version": "1.0.0",
           "publishTimestamp": 1793910449,
           "source": {
-            "type": "npm"
+            "type": "git",
+            "url": "https://github.com/SevenBit250/awe-dsh-plugins",
+            "commit": "73378b130ade2366eb8f4c091a30b5919da2bb9d",
+            "path": "dsh-notifications"
           },
           "engines": {
             "dsh": ">=0.2.2-rc.1 <0.3.0-0"

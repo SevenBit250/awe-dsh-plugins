@@ -55,6 +55,19 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /**
+     * Title of one session row. Session titles are a projection (`title`), so
+     * they are not top-level summary fields: they ride in the summary's
+     * projection hints, and a retained session exposes the projection directly.
+     */
+    function titleOfSummary(summary) {
+      if (summary === null || typeof summary !== 'object') return ''
+      const direct = summary.title
+      if (typeof direct === 'string' && direct !== '') return direct
+      const projected = summary.projections?.values?.title
+      return typeof projected === 'string' ? projected : ''
+    }
+
     return {
       inject: ['remote', 'locale'],
       apply(ctx) {
@@ -86,11 +99,34 @@ window.__ModuleLoader__.load({
           timers.delete(sessionId)
         }
 
+        /** Resolve a title: retained projection, then the list rows, then the cache. */
+        const readTitle = async (sessionId) => {
+          try {
+            const binding = ctx.get('sessions')?.binding?.(sessionId)
+            const value = binding?.session?.projections?.faceOf?.('title')?.getSnapshot?.()
+            if (typeof value === 'string' && value !== '') return value
+          } catch {}
+          try {
+            const remote = ctx.get('remote')
+            const list = remote?.session?.list
+            if (typeof list === 'function') {
+              const result = await list({})
+              if (result?.ok === true) {
+                const items = Array.isArray(result.value?.items) ? result.value.items : []
+                const item = items.find((entry) => entry !== null && entry?.sessionId === sessionId)
+                const title = titleOfSummary(item)
+                if (title !== '') return title
+              }
+            }
+          } catch {}
+          return titles.get(sessionId) ?? ''
+        }
+
         /** Raise the system notification for one finished conversation. */
-        const show = (sessionId) => {
+        const show = async (sessionId) => {
           if (typeof Notification === 'undefined') return
           if (Notification.permission !== 'granted') return
-          const title = titles.get(sessionId) ?? ''
+          const title = await readTitle(sessionId)
           let notification
           try {
             // No `tag`: a tagged notification can be replaced silently by the next
@@ -133,7 +169,8 @@ window.__ModuleLoader__.load({
                 ? summary.id
                 : ''
             if (id === '') return
-            if (typeof summary.title === 'string' && summary.title !== '') titles.set(id, summary.title)
+            const title = titleOfSummary(summary)
+            if (title !== '') titles.set(id, title)
             const parent = summary.parentSessionId ?? summary.parentId
             if (typeof parent === 'string' && parent !== '') children.add(id)
           })
@@ -151,7 +188,7 @@ window.__ModuleLoader__.load({
               timers.delete(sessionId)
               if (running.get(sessionId) === true) return
               if (!inBackground) return
-              show(sessionId)
+              void show(sessionId).catch(() => {})
             }, SETTLE_MS)
             timers.set(sessionId, timer)
           })

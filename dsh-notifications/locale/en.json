@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Completion notifications",
-    "description": "Show a system notification when a conversation finishes while the window is in the background."
+    "description": "Show a system notification when a conversation finishes."
   }
 }

@@ -7,8 +7,7 @@
  * System notification (Windows Action Center / macOS Notification Center);
  * nothing is drawn inside the application window.
  *
- * It is raised only while the window is in the background, and a short debounce
- * merges the gap between two turns of the same conversation.
+ * A short debounce merges the gap between two turns of the same conversation.
  *
  * @module @local/dsh-notifications/client
  */
@@ -82,9 +81,11 @@ window.__ModuleLoader__.load({
           const title = titles.get(sessionId) ?? ''
           let notification
           try {
+            // No `tag`: a tagged notification can be replaced silently by the next
+            // one, which is why a second completion used to arrive without a banner.
             notification = new Notification(t('notify.title'), {
               body: title === '' ? t('notify.bodyPlain') : t('notify.body').replace('{title}', title),
-              tag: `dsh-session-${sessionId}`,
+              silent: false,
             })
           } catch {
             return
@@ -137,8 +138,6 @@ window.__ModuleLoader__.load({
             const timer = setTimeout(() => {
               timers.delete(sessionId)
               if (running.get(sessionId) === true) return
-              // A focused window already shows the result; do not interrupt.
-              if (!document.hidden && document.hasFocus()) return
               show(sessionId)
             }, SETTLE_MS)
             timers.set(sessionId, timer)

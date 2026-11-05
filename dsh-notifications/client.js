@@ -10,6 +10,9 @@
  * Notifications are only raised while the window is in the background, and a
  * short debounce absorbs the gap between two turns of the same conversation.
  *
+ * A diagnostic trace is published to the Host endpoint so the capability can be
+ * checked from outside the window; it is temporary scaffolding for validation.
+ *
  * @module @local/dsh-notifications/client
  */
 window.__ModuleLoader__.load({
@@ -19,6 +22,8 @@ window.__ModuleLoader__.load({
     const NS = 'dsh-notifications'
     /** Delay that merges a finished turn with an immediately following one. */
     const SETTLE_MS = 800
+    /** Where the capability trace is published. */
+    const REPORT_PATH = '/dsh-notifications/report'
 
     const ZH = {
       'notify.title': '任务完成',
@@ -66,6 +71,42 @@ window.__ModuleLoader__.load({
         /** sessionId → pending settle timer. */
         const timers = new Map()
 
+        /** Diagnostic snapshot published to the Host endpoint. */
+        const trace = {
+          at: 0,
+          permission: 'unsupported',
+          testShown: false,
+          testError: null,
+          subscribed: false,
+          statusEvents: 0,
+          addedEvents: 0,
+          runningFalse: 0,
+          skippedFocused: 0,
+          notifications: 0,
+          lastStatus: null,
+          lastNotify: null,
+          hidden: null,
+          focused: null,
+        }
+
+        let flushTimer
+        const flush = () => {
+          flushTimer = undefined
+          trace.at = Date.now()
+          try {
+            trace.hidden = document.hidden
+            trace.focused = document.hasFocus()
+          } catch {}
+          const data = encodeURIComponent(JSON.stringify(trace))
+          try {
+            fetch(`${REPORT_PATH}?data=${data}`, { cache: 'no-store' }).catch(() => {})
+          } catch {}
+        }
+        const scheduleFlush = () => {
+          if (flushTimer !== undefined) return
+          flushTimer = setTimeout(flush, 400)
+        }
+
         const cancel = (sessionId) => {
           const timer = timers.get(sessionId)
           if (timer === undefined) return
@@ -74,10 +115,18 @@ window.__ModuleLoader__.load({
         }
 
         const show = (sessionId) => {
-          if (typeof Notification === 'undefined') return
-          if (Notification.permission !== 'granted') return
-          // Only when the user is elsewhere; a focused window already shows the result.
-          if (!document.hidden && document.hasFocus()) return
+          trace.notifications += 1
+          trace.lastNotify = { sessionId, at: Date.now() }
+          if (typeof Notification === 'undefined') {
+            trace.testError = 'Notification API unavailable'
+            scheduleFlush()
+            return
+          }
+          if (Notification.permission !== 'granted') {
+            trace.testError = `permission ${Notification.permission}`
+            scheduleFlush()
+            return
+          }
           const title = titles.get(sessionId) ?? ''
           let notification
           try {
@@ -85,7 +134,9 @@ window.__ModuleLoader__.load({
               body: title === '' ? t('notify.bodyPlain') : t('notify.body').replace('{title}', title),
               tag: `dsh-session-${sessionId}`,
             })
-          } catch {
+          } catch (error) {
+            trace.testError = String(error?.message ?? error)
+            scheduleFlush()
             return
           }
           notification.onclick = () => {
@@ -99,12 +150,14 @@ window.__ModuleLoader__.load({
               notification.close()
             } catch {}
           }
+          scheduleFlush()
         }
 
         let offAdded
         let offStatus
         try {
           offAdded = ctx.remote.$on('api-session/added', (summary) => {
+            trace.addedEvents += 1
             if (summary === null || typeof summary !== 'object') return
             const id = typeof summary.sessionId === 'string'
               ? summary.sessionId
@@ -115,29 +168,45 @@ window.__ModuleLoader__.load({
             if (typeof summary.title === 'string' && summary.title !== '') titles.set(id, summary.title)
             const parent = summary.parentSessionId ?? summary.parentId
             if (typeof parent === 'string' && parent !== '') children.add(id)
+            scheduleFlush()
           })
           offStatus = ctx.remote.$on('api-session/status', (sessionId, isRunning) => {
-            if (typeof sessionId !== 'string') return
+            trace.statusEvents += 1
+            trace.lastStatus = { sessionId, running: isRunning === true }
+            if (typeof sessionId !== 'string') {
+              scheduleFlush()
+              return
+            }
             const wasRunning = running.get(sessionId) === true
             running.set(sessionId, isRunning === true)
             if (isRunning === true) {
               cancel(sessionId)
+              scheduleFlush()
               return
             }
-            if (!wasRunning || children.has(sessionId)) return
+            trace.runningFalse += 1
+            if (!wasRunning || children.has(sessionId)) {
+              scheduleFlush()
+              return
+            }
             cancel(sessionId)
             const timer = setTimeout(() => {
               timers.delete(sessionId)
               if (running.get(sessionId) === true) return
+              if (!document.hidden && document.hasFocus()) {
+                trace.skippedFocused += 1
+                scheduleFlush()
+                return
+              }
               show(sessionId)
             }, SETTLE_MS)
             timers.set(sessionId, timer)
+            scheduleFlush()
           })
         } catch (error) {
-          try {
-            console.error('dsh-notifications: could not subscribe to session events', error)
-          } catch {}
+          trace.testError = String(error?.message ?? error)
         }
+        trace.subscribed = typeof offAdded === 'function' && typeof offStatus === 'function'
 
         ctx.effect(() => () => {
           try {
@@ -148,13 +217,32 @@ window.__ModuleLoader__.load({
           } catch {}
           for (const timer of timers.values()) clearTimeout(timer)
           timers.clear()
+          if (flushTimer !== undefined) clearTimeout(flushTimer)
         }, 'dsh-notifications: subscriptions')
 
-        try {
-          if (typeof offAdded === 'function' && typeof offStatus === 'function') {
-            console.info('dsh-notifications: watching for completion')
+        // Capability probe: one unconditional system notification on load.
+        if (typeof Notification !== 'undefined') {
+          trace.permission = Notification.permission
+          try {
+            const note = new Notification('DSH 通知测试', {
+              body: '看到这条就说明系统通知可用。',
+              tag: 'dsh-notification-test',
+            })
+            note.onshow = () => {
+              trace.testShown = true
+              scheduleFlush()
+            }
+            note.onerror = () => {
+              trace.testError = 'notification error'
+              scheduleFlush()
+            }
+          } catch (error) {
+            trace.testError = String(error?.message ?? error)
           }
-        } catch {}
+        } else {
+          trace.testError = 'Notification API unavailable'
+        }
+        scheduleFlush()
       },
     }
   },

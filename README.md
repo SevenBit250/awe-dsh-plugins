@@ -2,6 +2,13 @@
 
 DeepSeek Harness 插件集合。
 
+## 版本与索引
+
+- 每个插件是独立包，**版本写在各自的 `package.json` 的 `version` 字段**（当前都是 `1.0.0`）；这是 monorepo，不再使用 git tag 标记版本。
+- 根目录的 [`index.json`](index.json) 是 **插件市场索引（format 1）**，可被 DSH 的 Plugin Market 作为索引源读取。文档结构由 `@deepseek-ai/dsh-plugin-market-index` 校验（`format: 1`、`title.en`、`plugins[].versions[].source` 等）。
+
+要把本仓库作为索引源，先把它放到一个可访问的静态地址（例如 GitHub Pages / jsDelivr），然后在 DSH 的 Settings → Plugins → Market 里添加该 `index.json` 的 URL。索引里的 `source` 目前是 `npm`：包发布到 npm 后可直接安装；若走 Git，改成 `{ "type": "git", "url": "https://…", "commit": "<40 位 SHA>", "path": "<包目录>" }`。
+
 ## mcp-connectors
 
 侧栏「连接器」面板：管理 MCP 服务器连接，服务器工具以 `mcp__<名称>__<工具>` 直接提供给模型。

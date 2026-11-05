@@ -1,0 +1,89 @@
+{
+  "format": 1,
+  "title": {
+    "en": "Local DSH plugins",
+    "zh": "本地 DSH 插件"
+  },
+  "description": {
+    "en": "MCP connectors and completion notifications for DeepSeek Harness.",
+    "zh": "为 DeepSeek Harness 提供的 MCP 连接器与任务完成通知。"
+  },
+  "metadata": {
+    "categories": {
+      "tools": {
+        "title": {
+          "en": "Tools & Capabilities",
+          "zh": "工具与能力"
+        }
+      },
+      "notify": {
+        "title": {
+          "en": "Notifications & Integrations",
+          "zh": "通知与集成"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "@local/dsh-mcp-connectors",
+      "title": {
+        "en": "MCP connectors",
+        "zh": "MCP 连接器"
+      },
+      "description": {
+        "en": "Manage MCP server connections from a sidebar panel and expose their tools to the model.",
+        "zh": "在侧栏管理 MCP 服务器连接，并把它们的工具提供给模型。"
+      },
+      "metadata": {
+        "category": "tools",
+        "keywords": [
+          "mcp",
+          "connectors"
+        ]
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "publishTimestamp": 1793910449,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+          }
+        }
+      ]
+    },
+    {
+      "name": "@local/dsh-notifications",
+      "title": {
+        "en": "Completion notifications",
+        "zh": "任务完成通知"
+      },
+      "description": {
+        "en": "Show a system notification when a conversation finishes while the window is in the background.",
+        "zh": "窗口在后台时，会话结束发送一条系统通知。"
+      },
+      "metadata": {
+        "category": "notify",
+        "keywords": [
+          "notification",
+          "desktop"
+        ]
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "publishTimestamp": 1793910449,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+          }
+        }
+      ]
+    }
+  ]
+}

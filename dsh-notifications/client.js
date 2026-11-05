@@ -1,17 +1,14 @@
 /**
  * Completion notifications — Web half.
  *
- * The page already receives forwarded session events, so a conversation that
- * goes from running to idle is the completion signal. A system notification is
- * shown through the Web Notification API, which the desktop shell renders as an
- * Operating System notification (Windows Action Center / macOS Notification
- * Center); nothing is drawn inside the application window.
+ * The page receives forwarded session events, so a conversation that goes from
+ * running to idle is the completion signal. A system notification is shown
+ * through the Web Notification API, which the desktop shell renders as an
+ * Operating System notification; nothing is drawn inside the application window.
  *
- * Notifications are only raised while the window is in the background, and a
- * short debounce absorbs the gap between two turns of the same conversation.
- *
- * A diagnostic trace is published to the Host endpoint so the capability can be
- * checked from outside the window; it is temporary scaffolding for validation.
+ * Diagnostic scaffolding (temporary): the page publishes a trace to the Host and
+ * polls it for remote "fire a test notification" requests, so the capability can
+ * be exercised without reloading the page.
  *
  * @module @local/dsh-notifications/client
  */
@@ -22,8 +19,10 @@ window.__ModuleLoader__.load({
     const NS = 'dsh-notifications'
     /** Delay that merges a finished turn with an immediately following one. */
     const SETTLE_MS = 800
-    /** Where the capability trace is published. */
+    /** Where the capability trace is published and triggers are read. */
     const REPORT_PATH = '/dsh-notifications/report'
+    /** How often the page checks for a remote test request. */
+    const POLL_MS = 2000
 
     const ZH = {
       'notify.title': '任务完成',
@@ -70,6 +69,8 @@ window.__ModuleLoader__.load({
         const running = new Map()
         /** sessionId → pending settle timer. */
         const timers = new Map()
+        /** Notifications kept referenced until they close, so they are not collected. */
+        const live = new Set()
 
         /** Diagnostic snapshot published to the Host endpoint. */
         const trace = {
@@ -85,6 +86,7 @@ window.__ModuleLoader__.load({
           notifications: 0,
           lastStatus: null,
           lastNotify: null,
+          lastFire: null,
           hidden: null,
           focused: null,
         }
@@ -107,6 +109,75 @@ window.__ModuleLoader__.load({
           flushTimer = setTimeout(flush, 400)
         }
 
+        /**
+         * Raise one notification and record what the API reports. The reference is
+         * retained until close or timeout: a collected Notification can be dropped
+         * before the platform presents it.
+         */
+        const raise = (title, body, tag, label) => {
+          trace.notifications += 1
+          const detail = {
+            label,
+            at: Date.now(),
+            hidden: document.hidden,
+            focused: document.hasFocus(),
+            shown: false,
+            error: null,
+          }
+          trace.lastFire = detail
+          trace.lastNotify = { label, at: detail.at }
+          if (typeof Notification === 'undefined') {
+            detail.error = 'Notification API unavailable'
+            scheduleFlush()
+            return
+          }
+          detail.permission = Notification.permission
+          if (Notification.permission !== 'granted') {
+            detail.error = `permission ${Notification.permission}`
+            scheduleFlush()
+            return
+          }
+          let note
+          try {
+            note = new Notification(title, { body, tag })
+          } catch (error) {
+            detail.error = String(error?.message ?? error)
+            scheduleFlush()
+            return
+          }
+          live.add(note)
+          const drop = () => {
+            live.delete(note)
+          }
+          note.onshow = () => {
+            detail.shown = true
+            scheduleFlush()
+          }
+          note.onerror = () => {
+            detail.error = 'notification error'
+            drop()
+            scheduleFlush()
+          }
+          note.onclose = drop
+          note.onclick = () => {
+            try {
+              window.focus()
+            } catch {}
+            try {
+              ctx.get('uiWorkspace')?.openSession?.(detail.sessionId ?? '')
+            } catch {}
+            try {
+              note.close()
+            } catch {}
+            drop()
+          }
+          setTimeout(() => {
+            drop()
+            scheduleFlush()
+          }, 60000)
+          scheduleFlush()
+        }
+
         const cancel = (sessionId) => {
           const timer = timers.get(sessionId)
           if (timer === undefined) return
@@ -115,42 +186,14 @@ window.__ModuleLoader__.load({
         }
 
         const show = (sessionId) => {
-          trace.notifications += 1
-          trace.lastNotify = { sessionId, at: Date.now() }
-          if (typeof Notification === 'undefined') {
-            trace.testError = 'Notification API unavailable'
-            scheduleFlush()
-            return
-          }
-          if (Notification.permission !== 'granted') {
-            trace.testError = `permission ${Notification.permission}`
-            scheduleFlush()
-            return
-          }
           const title = titles.get(sessionId) ?? ''
-          let notification
-          try {
-            notification = new Notification(t('notify.title'), {
-              body: title === '' ? t('notify.bodyPlain') : t('notify.body').replace('{title}', title),
-              tag: `dsh-session-${sessionId}`,
-            })
-          } catch (error) {
-            trace.testError = String(error?.message ?? error)
-            scheduleFlush()
-            return
-          }
-          notification.onclick = () => {
-            try {
-              window.focus()
-            } catch {}
-            try {
-              ctx.get('uiWorkspace')?.openSession?.(sessionId)
-            } catch {}
-            try {
-              notification.close()
-            } catch {}
-          }
-          scheduleFlush()
+          trace.lastFireSession = sessionId
+          raise(
+            t('notify.title'),
+            title === '' ? t('notify.bodyPlain') : t('notify.body').replace('{title}', title),
+            `dsh-session-${sessionId}`,
+            'completion',
+          )
         }
 
         let offAdded
@@ -208,6 +251,23 @@ window.__ModuleLoader__.load({
         }
         trace.subscribed = typeof offAdded === 'function' && typeof offStatus === 'function'
 
+        // Remote test trigger: the Host stamps `fireAt`; every new stamp fires once.
+        let lastFireAt = 0
+        let pollTimer
+        const poll = async () => {
+          try {
+            const response = await fetch(REPORT_PATH, { cache: 'no-store' })
+            if (!response.ok) return
+            const body = await response.json()
+            const fireAt = typeof body?.fireAt === 'number' ? body.fireAt : 0
+            if (fireAt > lastFireAt) {
+              lastFireAt = fireAt
+              raise('DSH 通知测试（手动）', '这条由远程触发，用于验证系统通知。', `dsh-test-${fireAt}`, 'remote')
+            }
+          } catch {}
+        }
+        pollTimer = setInterval(poll, POLL_MS)
+
         ctx.effect(() => () => {
           try {
             offAdded?.()
@@ -218,6 +278,7 @@ window.__ModuleLoader__.load({
           for (const timer of timers.values()) clearTimeout(timer)
           timers.clear()
           if (flushTimer !== undefined) clearTimeout(flushTimer)
+          if (pollTimer !== undefined) clearInterval(pollTimer)
         }, 'dsh-notifications: subscriptions')
 
         // Capability probe: one unconditional system notification on load.
@@ -228,6 +289,7 @@ window.__ModuleLoader__.load({
               body: '看到这条就说明系统通知可用。',
               tag: 'dsh-notification-test',
             })
+            live.add(note)
             note.onshow = () => {
               trace.testShown = true
               scheduleFlush()
@@ -236,6 +298,12 @@ window.__ModuleLoader__.load({
               trace.testError = 'notification error'
               scheduleFlush()
             }
+            note.onclose = () => {
+              live.delete(note)
+            }
+            setTimeout(() => {
+              live.delete(note)
+            }, 60000)
           } catch (error) {
             trace.testError = String(error?.message ?? error)
           }

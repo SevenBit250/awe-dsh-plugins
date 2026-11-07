@@ -15,7 +15,7 @@ DeepSeek Harness 插件集合。
 git+https://github.com/SevenBit250/awe-dsh-plugins.git#<40 位 SHA>&path:/mcp-connectors
 ```
 
-所以改动插件代码后，需要把 `index.json` 里两个版本的 `commit` 更新为包含该改动的提交 SHA（索引文件本身可以在之后的提交里更新，安装始终指向被固定的那个 commit）。若改为发布到 npm，则把 `source` 换成 `{ "type": "npm" }`（或带 `registry`）。
+所以改动插件代码后，需要把 `index.json` 里该插件版本的 `commit` 更新为包含该改动的提交 SHA（索引文件本身可以在之后的提交里更新，安装始终指向被固定的那个 commit）。若改为发布到 npm，则把 `source` 换成 `{ "type": "npm" }`（或带 `registry`）。
 
 ## mcp-connectors
 
@@ -46,23 +46,3 @@ pnpm install
 - Host 半区（`index.js`）改动：在 Plugin Manager 里关闭再启用该插件，或重启 DSH。
 - Web 半区（`client.js`）改动：刷新页面（F5）。
 
-## dsh-notifications
-
-会话在后台时发**系统通知**（Windows 操作中心 / macOS 通知中心），覆盖两类事件：
-
-| 事件 | 触发 | 通知 |
-| --- | --- | --- |
-| 任务完成 | `api-session/status` 由 running 变 idle | 「任务完成」+ 会话标题 |
-| 需要你处理 | 会话状态里的 `pendingInput` 新增 `approval` / `question` / `other` | 「需要审批」「等待你的回答」「等待你处理」 |
-
-实现要点：
-
-- 完成通知：去抖 800ms，合并同一会话的连续轮次
-- 待处理通知：会话在运行时每 2 秒读一次 `ctx.remote.session.state`（unary Remote，与已验证的 `session/list` 同一套调用；后台窗口的定时器在本环境里照常运行），`pendingInput` 里出现新类型时通知；该类型被处理掉后再次出现会重新通知
-  - `pendingInput` 来自 Host 的 pending Remote request 采样：`approval/request`、`user-questions/request` 以及其他阻塞式请求（如计划卡）分别映射为 `approval` / `question` / `other`
-  - 会话空闲或被移除时停止轮询
-- 后台判定：由 `visibilitychange` 与窗口 `focus`/`blur` 事件维护状态位，**不在触发时临时探测** `hasFocus()`
-- 通知对象保留引用到关闭，避免被 GC 提前回收；不使用 `tag`，避免后一条静默覆盖前一条
-- 通知只带系统默认声音；点击通知会聚焦窗口并打开该会话
-- 依赖：api-remotes（`ctx.remote.$on` / `ctx.remote.session.observeState`）、client-locale；不需要 Host 服务
-- 已知限制：应用完全退出时不会有通知；子会话（subagent）通过 `api-session/added` 的父会话字段过滤

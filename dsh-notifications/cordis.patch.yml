@@ -1,4 +1,0 @@
-- insert:
-    - id: dsh-notifications
-      name: '@local/dsh-notifications'
-      config: {}

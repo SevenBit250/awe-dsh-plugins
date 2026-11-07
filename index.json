@@ -5,8 +5,8 @@
     "zh": "本地 DSH 插件"
   },
   "description": {
-    "en": "MCP connectors and completion notifications for DeepSeek Harness.",
-    "zh": "为 DeepSeek Harness 提供的 MCP 连接器与任务完成通知。"
+    "en": "MCP connectors for DeepSeek Harness.",
+    "zh": "为 DeepSeek Harness 提供的 MCP 连接器。"
   },
   "metadata": {
     "categories": {
@@ -14,12 +14,6 @@
         "title": {
           "en": "Tools & Capabilities",
           "zh": "工具与能力"
-        }
-      },
-      "notify": {
-        "title": {
-          "en": "Notifications & Integrations",
-          "zh": "通知与集成"
         }
       }
     }
@@ -51,65 +45,6 @@
             "url": "https://github.com/SevenBit250/awe-dsh-plugins",
             "commit": "73378b130ade2366eb8f4c091a30b5919da2bb9d",
             "path": "mcp-connectors"
-          },
-          "engines": {
-            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
-          }
-        }
-      ]
-    },
-    {
-      "name": "@local/dsh-notifications",
-      "title": {
-        "en": "Completion notifications",
-        "zh": "任务完成通知"
-      },
-      "description": {
-        "en": "Show a system notification when a conversation finishes while the window is in the background.",
-        "zh": "窗口在后台时，会话结束发送一条系统通知。"
-      },
-      "metadata": {
-        "category": "notify",
-        "keywords": [
-          "notification",
-          "desktop"
-        ]
-      },
-      "versions": [
-        {
-          "version": "1.1.1",
-          "publishTimestamp": 1794083705,
-          "source": {
-            "type": "git",
-            "url": "https://github.com/SevenBit250/awe-dsh-plugins",
-            "commit": "fc03cff5405e033650141f25c031494a42cd21c3",
-            "path": "dsh-notifications"
-          },
-          "engines": {
-            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
-          }
-        },
-        {
-          "version": "1.1.0",
-          "publishTimestamp": 1794082010,
-          "source": {
-            "type": "git",
-            "url": "https://github.com/SevenBit250/awe-dsh-plugins",
-            "commit": "5be27c48b8d2e018c702e300fbde934df701b5b5",
-            "path": "dsh-notifications"
-          },
-          "engines": {
-            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
-          }
-        },
-        {
-          "version": "1.0.0",
-          "publishTimestamp": 1793910449,
-          "source": {
-            "type": "git",
-            "url": "https://github.com/SevenBit250/awe-dsh-plugins",
-            "commit": "73378b130ade2366eb8f4c091a30b5919da2bb9d",
-            "path": "dsh-notifications"
           },
           "engines": {
             "dsh": ">=0.2.2-rc.1 <0.3.0-0"

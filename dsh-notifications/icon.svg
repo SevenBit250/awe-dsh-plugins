@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Completion notifications">
-  <rect x="2" y="2" width="60" height="60" rx="16" fill="#1f6feb"/>
-  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32 13a13 13 0 0 1 13 13v9l4 6H15l4-6v-9a13 13 0 0 1 13-13z"/>
-    <path d="M27 46a5 5 0 0 0 10 0"/>
-  </g>
-</svg>

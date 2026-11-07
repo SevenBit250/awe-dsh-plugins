@@ -58,9 +58,9 @@ pnpm install
 实现要点：
 
 - 完成通知：去抖 800ms，合并同一会话的连续轮次
-- 待处理通知：对**运行中**的会话开 `ctx.remote.session.observeState` 流（Host 推送，不轮询——后台窗口的定时器会被节流），`pendingInput` 里出现新类型时通知；该类型被处理掉后再次出现会重新通知
+- 待处理通知：会话在运行时每 2 秒读一次 `ctx.remote.session.state`（unary Remote，与已验证的 `session/list` 同一套调用；后台窗口的定时器在本环境里照常运行），`pendingInput` 里出现新类型时通知；该类型被处理掉后再次出现会重新通知
   - `pendingInput` 来自 Host 的 pending Remote request 采样：`approval/request`、`user-questions/request` 以及其他阻塞式请求（如计划卡）分别映射为 `approval` / `question` / `other`
-  - 流意外结束时，若会话仍在运行会在 5 秒后重连
+  - 会话空闲或被移除时停止轮询
 - 后台判定：由 `visibilitychange` 与窗口 `focus`/`blur` 事件维护状态位，**不在触发时临时探测** `hasFocus()`
 - 通知对象保留引用到关闭，避免被 GC 提前回收；不使用 `tag`，避免后一条静默覆盖前一条
 - 通知只带系统默认声音；点击通知会聚焦窗口并打开该会话

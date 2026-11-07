@@ -25,8 +25,8 @@ window.__ModuleLoader__.load({
     const NS = 'dsh-notifications'
     /** Delay that merges a finished turn with an immediately following one. */
     const SETTLE_MS = 800
-    /** Delay before re-opening a state stream that ended while its session still runs. */
-    const WATCH_RETRY_MS = 5000
+    /** How often a running session's state is re-read for new pending input. */
+    const PENDING_POLL_MS = 2000
 
     const ZH = {
       'notify.title': '任务完成',
@@ -111,10 +111,8 @@ window.__ModuleLoader__.load({
         const running = new Map()
         /** sessionId → pending settle timer. */
         const timers = new Map()
-        /** sessionId → pending state-stream retry timer. */
-        const retries = new Map()
-        /** sessionId → live state watcher. */
-        const watchers = new Map()
+        /** sessionId → live pending-input poller. */
+        const polls = new Map()
         /** Notifications kept referenced until they close, so they are not collected. */
         const live = new Set()
         /** Whether the window is hidden or another window holds the focus. */
@@ -214,17 +212,10 @@ window.__ModuleLoader__.load({
 
         /** Stop watching one session's state. */
         const unwatch = (sessionId) => {
-          const watcher = watchers.get(sessionId)
-          const retry = retries.get(sessionId)
-          if (retry !== undefined) {
-            clearTimeout(retry)
-            retries.delete(sessionId)
-          }
-          if (watcher === undefined) return
-          watchers.delete(sessionId)
-          try {
-            watcher.controller.abort()
-          } catch {}
+          const poll = polls.get(sessionId)
+          if (poll === undefined) return
+          polls.delete(sessionId)
+          if (poll.timer !== undefined) clearInterval(poll.timer)
         }
 
         /**
@@ -232,39 +223,41 @@ window.__ModuleLoader__.load({
          * is sampled from the Host's pending Remote requests, so an approval,
          * a question, or another blocking request (such as a plan review) shows
          * up here even though none of them is a durable session event.
+         *
+         * The unary `session/state` read is polled rather than streamed: the
+         * unary namespace method is the one proven to work from this plugin, and
+         * the page's timers keep running while the window is in the background.
          */
         const watch = (sessionId) => {
-          if (watchers.has(sessionId)) return
-          const observe = remote()?.session?.observeState
-          if (typeof observe !== 'function') return
-          const controller = new AbortController()
-          /** Kinds already announced for this watcher generation. */
-          const seen = new Set()
-          const watcher = { controller }
-          watchers.set(sessionId, watcher)
-          void (async () => {
+          if (polls.has(sessionId)) return
+          const read = remote()?.session?.state
+          if (typeof read !== 'function') return
+          const poll = { timer: undefined, busy: false, seen: new Set() }
+          polls.set(sessionId, poll)
+          const tick = async () => {
+            if (poll.busy) return
+            poll.busy = true
             try {
-              const handle = observe({ sessionId }, controller.signal)
-              for await (const state of handle) {
-                if (controller.signal.aborted) break
-                const present = new Set(Array.isArray(state?.pendingInput) ? state.pendingInput : [])
-                for (const kind of present) {
-                  if (seen.has(kind)) continue
-                  seen.add(kind)
-                  void showPending(sessionId, kind).catch(() => {})
-                }
-                for (const kind of [...seen]) if (!present.has(kind)) seen.delete(kind)
+              const result = await read({ sessionId })
+              if (polls.get(sessionId) !== poll) return
+              if (result?.ok !== true) return
+              const present = new Set(Array.isArray(result.value?.pendingInput) ? result.value.pendingInput : [])
+              for (const kind of present) {
+                if (poll.seen.has(kind)) continue
+                poll.seen.add(kind)
+                void showPending(sessionId, kind).catch(() => {})
               }
-            } catch {}
-            if (watchers.get(sessionId) !== watcher) return
-            watchers.delete(sessionId)
-            if (running.get(sessionId) !== true) return
-            const retry = setTimeout(() => {
-              retries.delete(sessionId)
-              if (running.get(sessionId) === true) watch(sessionId)
-            }, WATCH_RETRY_MS)
-            retries.set(sessionId, retry)
-          })()
+              for (const kind of [...poll.seen]) if (!present.has(kind)) poll.seen.delete(kind)
+            } catch {
+              // A failed read is retried on the next tick.
+            } finally {
+              poll.busy = false
+            }
+          }
+          void tick()
+          poll.timer = setInterval(() => {
+            void tick()
+          }, PENDING_POLL_MS)
         }
 
         let offAdded
@@ -332,16 +325,12 @@ window.__ModuleLoader__.load({
           try {
             offRemoved?.()
           } catch {}
-          for (const watcher of watchers.values()) {
-            try {
-              watcher.controller.abort()
-            } catch {}
+          for (const poll of polls.values()) {
+            if (poll.timer !== undefined) clearInterval(poll.timer)
           }
-          watchers.clear()
+          polls.clear()
           for (const timer of timers.values()) clearTimeout(timer)
           timers.clear()
-          for (const retry of retries.values()) clearTimeout(retry)
-          retries.clear()
         }, 'dsh-notifications: subscriptions')
       },
     }

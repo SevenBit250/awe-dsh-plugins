@@ -77,6 +77,19 @@
       },
       "versions": [
         {
+          "version": "1.1.1",
+          "publishTimestamp": 1794083705,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/SevenBit250/awe-dsh-plugins",
+            "commit": "fc03cff5405e033650141f25c031494a42cd21c3",
+            "path": "dsh-notifications"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+          }
+        },
+        {
           "version": "1.1.0",
           "publishTimestamp": 1794082010,
           "source": {

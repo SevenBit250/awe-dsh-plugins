@@ -1,9 +1,9 @@
 {
   "name": "@local/dsh-notifications",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Desktop notifications when a conversation finishes, delivered as Windows/macOS system notifications.",
+  "description": "Desktop notifications when a conversation finishes or needs your input, delivered as Windows/macOS system notifications.",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",

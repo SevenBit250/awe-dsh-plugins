@@ -48,11 +48,21 @@ pnpm install
 
 ## dsh-notifications
 
-会话从"运行中"转为"空闲"、且窗口在后台（最小化/隐藏/失焦）时，发一条**系统通知**（Windows 操作中心 / macOS 通知中心）。
+会话在后台时发**系统通知**（Windows 操作中心 / macOS 通知中心），覆盖两类事件：
 
-- 触发：订阅转发事件 `api-session/status`，去抖 800ms 合并同一会话的连续轮次
-- 后台判定：由 `visibilitychange` 与窗口 `focus`/`blur` 事件维护一个状态位，**不在触发时临时探测** `hasFocus()`——隐藏窗口的定时器会被节流，晚到的探测会误判成"用户已回来"而丢弃通知
-- 通知对象会保留引用到关闭，避免被 GC 提前回收；不使用 `tag`，避免后一条静默覆盖前一条
-- 点击通知会聚焦窗口并打开该会话
-- 依赖：`dsh.client.inject` 里的 api-remotes（`ctx.remote.$on`）、client-locale；不需要 Host 服务
+| 事件 | 触发 | 通知 |
+| --- | --- | --- |
+| 任务完成 | `api-session/status` 由 running 变 idle | 「任务完成」+ 会话标题 |
+| 需要你处理 | 会话状态里的 `pendingInput` 新增 `approval` / `question` / `other` | 「需要审批」「等待你的回答」「等待你处理」 |
+
+实现要点：
+
+- 完成通知：去抖 800ms，合并同一会话的连续轮次
+- 待处理通知：对**运行中**的会话开 `ctx.remote.session.observeState` 流（Host 推送，不轮询——后台窗口的定时器会被节流），`pendingInput` 里出现新类型时通知；该类型被处理掉后再次出现会重新通知
+  - `pendingInput` 来自 Host 的 pending Remote request 采样：`approval/request`、`user-questions/request` 以及其他阻塞式请求（如计划卡）分别映射为 `approval` / `question` / `other`
+  - 流意外结束时，若会话仍在运行会在 5 秒后重连
+- 后台判定：由 `visibilitychange` 与窗口 `focus`/`blur` 事件维护状态位，**不在触发时临时探测** `hasFocus()`
+- 通知对象保留引用到关闭，避免被 GC 提前回收；不使用 `tag`，避免后一条静默覆盖前一条
+- 通知只带系统默认声音；点击通知会聚焦窗口并打开该会话
+- 依赖：api-remotes（`ctx.remote.$on` / `ctx.remote.session.observeState`）、client-locale；不需要 Host 服务
 - 已知限制：应用完全退出时不会有通知；子会话（subagent）通过 `api-session/added` 的父会话字段过滤
